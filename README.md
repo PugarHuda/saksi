@@ -268,7 +268,8 @@ path over a separately-keyed note; it does not demonstrate a second party.
 ## Repository
 
 ```
-contracts/     Foundry. SaksiPool + the seven exported Groth16 verifiers. 173 tests,
+contracts/     Foundry. SaksiPool + seven exported Groth16 verifiers, six of them deployed
+               (merkleUpdate's is not wired — see the limits). 173 tests,
                nine of them invariants driven by a fuzzing handler.
 circuits/      Circom sources, proving keys, witness calculators.
 ops/           The register's operations — issuance, association set, validator

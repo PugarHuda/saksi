@@ -9,7 +9,9 @@ Built for the Cleanverse Build: Trusted Assets Hackathon, RWA track.
 ## Run it
 
 ```bash
-npm test                      # 131 Foundry tests (cd contracts && forge test)
+npm test                      # parses every ops script, then runs the Foundry suite
+                              # (173 at the last count, including 9 invariants — but run it,
+                              #  this line has already been wrong once)
 node ops/evidence.mjs         # rebuild the evidence table from the chain
 node ops/evidence.mjs --md    # same, markdown, for SUMMARY.md
 cd web && npm run dev         # console at localhost:3000

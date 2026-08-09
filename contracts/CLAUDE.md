@@ -3,7 +3,8 @@
 Foundry. `SaksiPool.sol` (~812 lines) plus six generated Groth16 verifiers.
 
 ```bash
-forge test              # 131 tests, must stay green
+forge test              # must stay green. 173 at the last count: 9 invariants driven by a
+                        # fuzzing handler, 18 fuzz cases, the rest examples.
 forge test --match-test test_E7 -vvv
 forge build
 ```
