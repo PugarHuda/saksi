@@ -281,6 +281,10 @@ input[type="text"]::placeholder { color: var(--muted); }
   border-radius: var(--r-sm);
   display: block;
   height: 1em;
+  /* Callers size these in em to match the value they stand in for — `w="20em"` for a field
+     element is 240px, which does not fit a 167px grid cell on a phone and pushed the whole
+     document sideways for as long as the read was in flight. */
+  max-width: 100%;
 }
 @media (prefers-reduced-motion: no-preference) {
   .skeleton { animation: shimmer 1.4s ease-in-out infinite; }

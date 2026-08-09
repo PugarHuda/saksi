@@ -17,5 +17,12 @@
     "provedAt": "2026-08-09T13:14:22.494Z",
     "aspRoot": "20523674371767629971802187004083499940314105259377807418370303228894354604905",
     "origin": "transact"
+  },
+  {
+    "commitment": "0x1c44f683272b5c307f0eb564f9a61177a20e1e05f289a99768a1eb6abdb5d161",
+    "depositTx": "0x78168fda9282e1d7933c942c102ab2d53b4049a98cda272b0eb7f23167f1291c",
+    "provedAt": "2026-08-09T13:14:22.493Z",
+    "aspRoot": null,
+    "origin": "received"
   }
 ]

@@ -121,7 +121,18 @@ const withdrawUnits = argOf("--withdraw") ? toUnits(argOf("--withdraw")) : 0n;
 // nothing had ever changed hands. A register whose positions cannot move to another
 // person is a vault with a disclosure API.
 const toPubKey = argOf("--to-pubkey") ? BigInt(argOf("--to-pubkey")) : null;
+// A label becomes a filename, so it is a path fragment with no validation between it and
+// the disk. "public" resolves to notes.public.json, which .gitignore deliberately
+// un-ignores — so it would write a live spending key into a tracked file. "../../x"
+// escapes the repository altogether. This project has leaked commitment openings twice;
+// this was a third route to the same place.
+const LABEL_OK = (l) =>
+  /^[a-z0-9_-]{1,32}$/i.test(l) && l.toLowerCase() !== "public";   // notes.public.json is tracked
 const toLabel = argOf("--to-label");
+if (toLabel && !LABEL_OK(toLabel)) {
+  console.error("--to-label must be letters, digits, _ or - : it becomes a filename");
+  process.exit(1);
+}
 if (toPubKey && !toLabel) {
   console.error("--to-pubkey needs --to-label: the recipient's note has to be written somewhere");
   process.exit(1);
@@ -273,7 +284,14 @@ fs.writeFileSync(
       // whole operation — this process cannot spend what it is sending.
       privKey: o.privKey ? o.privKey.toString() : null,
       to: o.to ?? null,
-      blinding: o.blinding.toString(),
+      // Not the recipient's. The private key controls SPENDING; the blinding controls
+      // DISCLOSURE — every disclosure circuit takes (amount, pubKey, blinding) and no key
+      // at all. Keeping it would leave the sender able to answer any audit about a note
+      // they gave away, including publishing its exact figure first and closing the
+      // request forever. Hygiene rather than proof: this process generated the blinding
+      // and the recipient has to trust it was not kept elsewhere. The structural fix is
+      // for the recipient to supply it with their public key.
+      blinding: o.to ? null : o.blinding.toString(),
     })),
     noteRoot: tree.root.toString(),
     withdraw: withdrawUnits.toString(),
@@ -303,6 +321,9 @@ fs.writeFileSync(TRANSFERS, JSON.stringify(transfers, null, 2) + "\n");
 // The spent notes are gone and the new ones are the register's; record them so the next
 // aggregate proof enumerates what the pool actually holds.
 const kept = notes.filter((n) => !ins.some((i) => i.commitment === n.commitment));
+// Positions this process cannot open but the register still holds. They belong in the
+// public index — a commitment is public, and leaving them out understates the register.
+const publicExtra = [];
 for (const o of outs) {
   // A note whose key this process does not hold is not ours to record as a position. It is
   // written to the recipient's own ledger, without a privKey, because there isn't one here.
@@ -322,6 +343,13 @@ for (const o of outs) {
       depositTx: txHash,
     });
     fs.writeFileSync(rf, JSON.stringify(led, null, 2) + "\n");
+    publicExtra.push({
+      commitment: hexOf(o.commitment),
+      depositTx: txHash,
+      provedAt: new Date().toISOString(),
+      aspRoot: null,                 // a transact carries no association-set proof
+      origin: "received",
+    });
     console.log(`\n${o.to} received a position, and only ${o.to} can spend it — this`);
     console.log(`process never held the key. Written to notes.${o.to}.json`);
     continue;
@@ -344,9 +372,28 @@ for (const o of outs) {
 fs.writeFileSync(path.join(ROOT, "notes.json"), JSON.stringify(kept, null, 2) + "\n");
 fs.writeFileSync(
   path.join(ROOT, "notes.public.json"),
-  JSON.stringify(kept.map(({ commitment, depositTx, provedAt, aspRoot, origin }) =>
-    ({ commitment, depositTx, provedAt, aspRoot, origin })), null, 2) + "\n",
+  JSON.stringify(
+    kept.map(({ commitment, depositTx, provedAt, aspRoot, origin }) =>
+      ({ commitment, depositTx, provedAt, aspRoot, origin })).concat(publicExtra),
+    null, 2) + "\n",
 );
+
+// Publish the root that contains the leaves this transfer just inserted. Without it the
+// new positions — including one paid to someone else — have no Merkle path into any known
+// root, so nobody can spend them, and the recipient would depend on the sender choosing to
+// act again. The sender should not hold that veto over a note they have given away.
+{
+  const after = call(dep.pool, "allCommitments()(bytes32[])")
+    .replace(/[[\]\s]/g, "").split(",").filter(Boolean).map((c) => BigInt(c));
+  const next = buildTree(h2, after, LEVELS);
+  if (call(dep.pool, "knownNoteRoot(uint256)(bool)", next.root.toString()) !== "true") {
+    console.log("\npublishing the root that contains the new leaves…");
+    console.log(
+      send(owner.priv, [dep.pool, "publishNoteRoot(uint256)", next.root.toString()])
+        .split("\n").filter((l) => /^(status|blockNumber)/.test(l)).join("  "),
+    );
+  }
+}
 
 console.log(`\ntwo notes spent, two created. tx ${txHash}`);
 console.log("nullifiers published; which input became which output is not on chain.");

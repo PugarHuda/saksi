@@ -137,7 +137,9 @@ async function send<T>(method: string, params: unknown[]): Promise<T> {
         ? "Monad is rate-limiting this browser — wait a moment and retry."
         : `Monad refused the read (HTTP ${res.status}).`,
     );
-    if (res.status === 429 || res.status >= 500) err[THROTTLED] = true;
+    // Only 429 is worth waiting out. Retrying a 500 just doubles how long a hard failure
+    // takes to reach the screen, and the console's whole claim is that it says so quickly.
+    if (res.status === 429) err[THROTTLED] = true;
     throw err;
   }
   let body: { error?: { message?: string }; result?: T };

@@ -13,8 +13,18 @@ import path from "node:path";
 import { ROOT } from "./env.mjs";
 import { noteTools, randomField } from "./note.mjs";
 
+// A label becomes a filename, so it is a path fragment with no validation between it and
+// the disk. "public" resolves to notes.public.json, which .gitignore deliberately
+// un-ignores — so it would write a live spending key into a tracked file. "../../x"
+// escapes the repository altogether. This project has leaked commitment openings twice;
+// this was a third route to the same place.
+const LABEL_OK = (l) =>
+  /^[a-z0-9_-]{1,32}$/i.test(l) && l.toLowerCase() !== "public";   // notes.public.json is tracked
 const label = process.argv[2];
-if (!label) { console.error("usage: node ops/keygen.mjs <label>"); process.exit(1); }
+if (!label || !LABEL_OK(label)) {
+  console.error("usage: node ops/keygen.mjs <label>   (letters, digits, _ and - only)");
+  process.exit(1);
+}
 
 const file = path.join(ROOT, `notes.${label}.json`);
 if (fs.existsSync(file)) {

@@ -98,7 +98,10 @@ if (md) line("```");
 // Skipped without credentials rather than failing: the chain half of this artefact must
 // still render for someone who cloned the repo and has no API key.
 try {
-  const { Cleanverse } = await import("./cleanverse.mjs");
+  // `new Cleanverse` and not `client()` on purpose: client() exits, and this section is
+  // deliberately skippable — the chain half of the artefact must still render for someone
+  // who cloned the repo and has no API key.
+  const { Cleanverse, APASS_VERDICT } = await import("./cleanverse.mjs");
   const cv = new Cleanverse();
   line();
   line(md ? "### The asset gate — Cleanverse's rule on the A-Token itself" : "ASSET GATE (verify_apass)");
@@ -122,7 +125,10 @@ try {
     seen.add(w.address.toLowerCase());
     const r = await cv.verifyApass(dep.chain, dep.asset, w.address);
     const pool = await call(dep.validator, CV + pad(dep.pool) + pad(w.address));
-    line(`  ${w.label.padEnd(10)} asset ${String(r.code).padEnd(2)} ${(r.message ?? "").padEnd(28)}pool ${BigInt(pool) === 1n}`);
+    // padEnd only pads. A frozen A-Pass answers with a 120-character revert blob, which ran
+    // straight into the next column and printed `…476epool false` in the evidence table.
+    const why = (APASS_VERDICT[r.code] ?? r.message ?? "").slice(0, 28);
+    line(`  ${w.label.padEnd(10)} asset ${String(r.code).padEnd(2)} ${why.padEnd(29)}pool ${BigInt(pool) === 1n}`);
   }
   if (md) line("```");
 } catch (e) {

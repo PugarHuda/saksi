@@ -93,6 +93,7 @@
     "verifyTx": "0x0c555e43a247e1ba52a27cda5947fcf6e75e2c5847ce180461f93fdb27a2b192",
     "verified": true,
     "proveMs": 1730,
-    "at": "2026-08-09T13:21:02.404Z"
+    "at": "2026-08-09T13:21:02.404Z",
+    "correction": "The register held FOUR live positions when this was answered. The enumerator reclassified the fourth — belonging to another holder — as retired, because its retirement count was derived from what this ledger could open, which is circular. The answer is true of the three it names and is NOT a statement about the register. The guard now counts retirements from the chain and refuses rather than trimming."
   }
 ]
