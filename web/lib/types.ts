@@ -1,0 +1,62 @@
+export type Deployment = {
+  chain?: string;
+  chainId?: number;
+  pool?: string;
+  validator?: string;
+  asset?: string;
+  assetSymbol?: string;
+  assetName?: string;
+  assetDecimals?: number;
+  atokenTx?: string;
+  atokenRequestId?: string;
+  issuer?: string;
+  aspRoot?: string;
+  aspAdmitted?: number;
+  aspBuiltAt?: string;
+  validatorRegisterTx?: string;
+  verifiers?: Record<string, string>;
+  explorer?: string;
+};
+
+export type AspMember = {
+  index: number;
+  wallet: string;
+  sourceKey: string;
+  tier: string | number;
+  countries: string[];
+  cvRecordId?: string;
+  currentKycHash?: string | null;
+  label?: string | null;
+};
+
+export type Asp = {
+  root: string;
+  levels: number;
+  builtAt: string;
+  admitted: number;
+  populationQueried: number;
+  rule: { minTier: number; countries: string[]; requireActive: boolean };
+  members: AspMember[];
+};
+
+export type AuditEntry = {
+  kind: "exact" | "threshold" | "range" | "aggregate";
+  question: string;
+  circuit: string;
+  contextHash: string;
+  answer: string;
+  requestTx?: string;
+  verifyTx?: string;
+  verified: boolean;
+  proveMs: number;
+  at: string;
+};
+
+export type Position = {
+  commitment: string;
+  wallet: string;
+  depositTx?: string;
+  provedAt: string;
+  aspRoot: string;
+  leafIndex: number;
+};
