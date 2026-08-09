@@ -14,6 +14,12 @@ export async function makePoseidon() {
 // Build a depth-`levels` tree from `leaves` (BigInt[]), padded with 0.
 // Returns { root, proof(index) -> {pathElements, leafIndex} }.
 export function buildTree(h2, leaves, levels) {
+  // Past 2^levels the halving loop hits a fractional length and throws — or, at an exact
+  // power of two, silently returns the root of a SUBTREE that omits every leaf above the
+  // capacity. The silent case is the dangerous one, so refuse both.
+  if (leaves.length > (1 << levels)) {
+    throw new Error(`${leaves.length} leaves exceeds the tree capacity of ${1 << levels}`);
+  }
   const size = 1 << levels;
   let layer = new Array(size).fill(0n);
   for (let i = 0; i < leaves.length; i++) layer[i] = leaves[i] ?? 0n;

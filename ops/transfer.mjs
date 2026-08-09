@@ -125,11 +125,26 @@ if (fee > withdrawUnits) {
   console.error("the relayer's fee cannot exceed the withdrawal it is paid from");
   process.exit(1);
 }
+if (withdrawUnits > 0n && /^0x0{40}$/i.test(recipient)) {
+  console.error("--withdraw needs --to: paying out to the zero address burns the tokens, and");
+  console.error("only the validator refusing address(0) stands between you and that.");
+  process.exit(1);
+}
 
-// A re-split, not a round number: two outputs that match neither input means the amounts
-// cannot be recovered by inspection even by someone who watched both deposits.
+// The split must be RANDOM, and this is not a nicety. A fixed ratio in a public repository
+// is a public constant, and deposits are plaintext, so an observer could compute every note
+// in the register by arithmetic and the shielding would buy nothing. An earlier version of
+// this file split 37/63 while the comment above it claimed the amounts "cannot be recovered
+// by inspection" — they could, from this file.
 const remaining = total - withdrawUnits;
-const outA = (remaining * 37n) / 100n;
+const pick = (n) => {
+  const b = crypto.getRandomValues(new Uint32Array(1))[0];
+  return (BigInt(b) * n) / 4294967296n;
+};
+// Keep both sides off the extremes: a zero-value output takes the circuit's dummy branch on
+// its next spend, which skips the Merkle check and burns a tree slot for nothing.
+const lo = remaining / 5n;
+const outA = remaining === 0n ? 0n : lo + pick(remaining - 2n * lo);
 const outB = remaining - outA;
 
 // Fresh keys for the outputs. The whole point is that the new notes are not linkable to
@@ -217,6 +232,29 @@ if (known !== "true") {
 const fmt = (x) => `[${x.join(",")}]`;
 const fmt2 = (x) => `[[${x[0].join(",")}],[${x[1].join(",")}]]`;
 
+// Persist the output secrets BEFORE the send. Between the transaction landing and the
+// ledger being written, a crash takes the privKey and blinding of both change notes with
+// it — and the commitments are already in the tree, so there is no recovery. deposit.mjs
+// writes its artifact first; this file did not.
+const hexOf = (v) => "0x" + v.toString(16).padStart(64, "0");
+fs.mkdirSync(path.join(ROOT, ".artifacts"), { recursive: true });
+fs.writeFileSync(
+  path.join(ROOT, ".artifacts", "last-transfer.json"),
+  JSON.stringify({
+    spender: spender.address,
+    spent: inNotes.map((n) => hexOf(n.commitment)),
+    outputs: outs.map((o) => ({
+      amount: o.amount.toString(),
+      commitment: hexOf(o.commitment),
+      privKey: o.privKey.toString(),
+      blinding: o.blinding.toString(),
+    })),
+    noteRoot: tree.root.toString(),
+    withdraw: withdrawUnits.toString(),
+    at: new Date().toISOString(),
+  }, null, 2),
+);
+
 console.log("\ntransacting…");
 const out = send(spender.priv, [dep.pool,
   "transact(uint256[2],uint256[2][2],uint256[2],uint256[7],address,address,uint256)",
@@ -228,14 +266,13 @@ const txHash = /transactionHash\s+(0x[0-9a-f]+)/.exec(out)?.[1];
 
 // The spent notes are gone and the new ones are the register's; record them so the next
 // aggregate proof enumerates what the pool actually holds.
-const hex = (v) => "0x" + v.toString(16).padStart(64, "0");
 const kept = notes.filter((n) => !ins.some((i) => i.commitment === n.commitment));
 for (const o of outs) {
   kept.push({
     wallet: spender.address,
     amount: o.amount.toString(),
     amountDisplay: Number(o.amount) / 1e6,
-    commitment: hex(o.commitment),
+    commitment: hexOf(o.commitment),
     privKey: o.privKey.toString(),
     blinding: o.blinding.toString(),
     pubKey: o.pubKey.toString(),

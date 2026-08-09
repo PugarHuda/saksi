@@ -101,7 +101,15 @@ if (!aspPath) {
   process.exit(1);
 }
 const asp = JSON.parse(fs.readFileSync(aspPath, "utf8"));
-for (const m of asp.members) wallets.set(m.wallet.toLowerCase(), m.label ?? "");
+// The published set reduces members this project does not operate to one-way leaves, so a
+// census run from a clone can only address the wallets it can see. Say what is missing
+// rather than throwing on the first redacted member.
+const addressable = asp.members.filter((m) => m.wallet);
+if (addressable.length < asp.members.length) {
+  console.log(`${asp.members.length - addressable.length} of ${asp.members.length} set members are`);
+  console.log("published as leaves only and cannot be addressed from this copy of the set.");
+}
+for (const m of addressable) wallets.set(m.wallet.toLowerCase(), m.label ?? "");
 
 // The association set applies our own min_tier rule and an active-status filter, which
 // would make this a sample rather than a census. Widen it to EVERY credential the

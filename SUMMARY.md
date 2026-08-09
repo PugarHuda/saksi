@@ -70,7 +70,7 @@ posts a question on-chain and waits for a proof that answers exactly it.
 | SaksiPool | [`0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA`](https://testnet.monadexplorer.com/address/0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA) |
 | Saksi Series A Note (our CVA) | [`0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B`](https://testnet.monadexplorer.com/address/0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B) |
 | Register | 8 commitments · 4 live positions · 1,630 CVA backed |
-| Foundry tests | **87 passing**, including an external audit's own exploit POCs |
+| Foundry tests | **87 passing**, including two external audits' own exploit POCs |
 
 **The shielded middle runs, and so does the exit.** One JoinSplit spent two of the
 issuer's positions and created two new ones (block 52209800); the inputs were 250 and 480, and
@@ -99,11 +99,20 @@ checkable with any RPC endpoint:
 The register cannot answer falsely. It can only fail to answer, and the failure is on the
 record permanently.
 
+The English in that table is not decoration either: each question's figure is hashed into
+`auditClaim` on-chain before an answer exists, so `claimHash(kind, cap)` recomputed from the
+words — "at most 500", "the 400–500 bracket", "at most 1,000" — equals what the contract
+stored. A reader can check that the question asked is the question the contract will accept
+an answer to, without trusting this document.
+
 ## Scalability — the ceilings, named
 
-Merkle depth 10 → **1,024 leaves**; the association set is at 524 of them today. Deposit
-costs ~2.9M gas (two Groth16 verifications plus the live validator call); verification 264k;
-proving 610–1,676 ms client-side. The aggregate circuit is fixed at **5 slots**, so it
+Merkle depth 10 → **1,024 leaves**; the association set is at 524 of them today. Proving runs 610–1,727 ms client-side, which is the one performance figure in this
+project that is checkable — it is recorded per row in `audit-log.json`. Gas is not: Monad
+charges the submitted limit and reports it back as `gasUsed`, so every receipt here reads
+`gasUsed == gasLimit` and no on-chain gas number can be reproduced. The Foundry suite
+measures a deposit at ~2.9M and a disclosure verification at ~264k, and that is a local
+measurement, not an observation of this chain. The aggregate circuit is fixed at **5 slots**, so it
 already cannot span a register of eight commitments — after the shielded transfer the auditor
 enumerates the four live positions and the tool *refuses* rather than answering over a
 subset. Upgrades are known: depth 20 gives a million leaves at roughly double the compliance
@@ -136,6 +145,14 @@ by rebuild, and an auditor who can compel a bounded answer and get a *recorded n
 - **Both gates root in one authority.** They diverge in *time*, not in trust: a compromised
   Cleanverse sandbox defeats both.
 - **Single-EOA owner**, no timelock or multisig, who can rotate roots and set the auditor.
+- **The four positions on chain today are arithmetically derivable, and that is our bug, not
+  the design's.** `ops/transfer.mjs` split each JoinSplit 37/63 — a constant in a public
+  repository — and deposits are plaintext, so anyone can compute every note from the deposit
+  log: 730 × 0.37 = 270.1, and so on down to a checksum that matches the pool's balance. The
+  splitter now draws from the CSPRNG, but the notes already inserted were created under the
+  old one. A reviewer should assume the current register's amounts are readable; the property
+  the design offers is only as good as the randomness the operator's tooling supplies, and
+  ours was not random until an audit said so.
 - **A spent position can still answer an audit.** `_requireKnown` consults the commitment
   set, and structurally cannot consult the nullifier set — deriving one from the other
   on-chain is exactly what the design prevents. So a disclosure can truthfully answer about
@@ -167,6 +184,16 @@ The second: our association set was admitting fifteen credentials Cleanverse had
 the set was *more permissive* than the compliance provider, the one direction it must never
 be. The instrument that was supposed to catch this had been sampling four hardcoded addresses
 and reporting "0 disagreements" for a set of five hundred. It sweeps every member now.
+
+## What the tests do and do not prove
+
+The 87 Foundry tests exercise the pool's binding, accounting and access control against a
+mock verifier that returns a settable boolean — they prove the contract's logic, not the
+Groth16 cryptography. The cryptography is proved by the chain instead: every deposit,
+transfer, withdrawal and disclosure above was accepted by a deployed verifier contract whose
+verification key is committed in this repo. Twenty-three of the tests are an adversarial
+review's own exploit proofs, kept as regression tests, and three of those assert limitations
+that remain open rather than pretending they were closed.
 
 ## Prior work, declared
 
