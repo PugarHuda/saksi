@@ -32,3 +32,6 @@ asp.previous.json
 # Archived ledgers from superseded pools - they carry opening secrets.
 *.bak
 *.pool-0x*.bak
+
+# build artefact
+web/tsconfig.tsbuildinfo

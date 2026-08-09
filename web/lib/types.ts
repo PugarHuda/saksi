@@ -20,7 +20,9 @@ export type Deployment = {
 
 export type AspMember = {
   index: number;
-  wallet: string;
+  // Absent for members this project does not operate: the published set reduces them to
+  // leaves, so every consumer must handle the missing address rather than assume it.
+  wallet?: string;
   sourceKey: string;
   tier: string | number;
   countries: string[];
@@ -29,7 +31,14 @@ export type AspMember = {
   label?: string | null;
 };
 
-export type SetChange = { wallet: string; tier: string | number; label?: string | null };
+export type SetChange = { wallet?: string; tier: string | number; label?: string | null };
+
+export type AspSubject = {
+  address: string;
+  sourceKey: string;
+  inSet: boolean;
+  inPreviousSet: boolean;
+};
 
 export type Asp = {
   root: string;
@@ -41,6 +50,7 @@ export type Asp = {
   dropped?: SetChange[];
   added?: SetChange[];
   rule: { minTier: number; countries: string[]; requireActive: boolean };
+  subjects?: AspSubject[];
   members: AspMember[];
 };
 

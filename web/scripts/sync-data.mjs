@@ -17,7 +17,8 @@ const files = [
   "deployment.json",
   ["asp.public.json", "asp.json"],
   "audit-log.json",
-  "notes.json",
+  // the redacted source, so the console can never be wired to the file holding secrets
+  ["notes.public.json", "notes.json"],
   "measurement.json",
 ];
 for (const entry of files) {

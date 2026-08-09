@@ -95,6 +95,15 @@ async function pullApassPopulation() {
 
 const admits = (rec) => {
   if (RULE.requireActive && Number(rec.expirationTime) * 1000 <= Date.now()) return false;
+  // Status, checked here for EVERY row. Dropping the server-side status filter recovered
+  // the ~87%% of rows that carry a null status, and took the client-side check out with it:
+  // 15 wallets Cleanverse had FROZEN were handed membership witnesses by this set, while
+  // their own validator refused all 15. A set that is more permissive than the compliance
+  // provider inverts the safety direction the whole design rests on.
+  //
+  // Null is "never set", which the registry treats as live; 1 is active; anything else is
+  // frozen or worse.
+  if (rec.status != null && Number(rec.status) !== 1) return false;
   if (Number(rec.tier) <= RULE.minTier) return false;
   if (RULE.countries.length) {
     const tags = (rec.countries ?? []).map((c) => c.toUpperCase());
@@ -184,6 +193,31 @@ if (isCli && cmd === "build") {
     (fs.existsSync(WALLETS) ? JSON.parse(fs.readFileSync(WALLETS, "utf8")) : [])
       .map((w) => w.address.toLowerCase()),
   );
+  // dropped/added carry a wallet unconditionally, and spreading `out` published them
+  // verbatim — so the file redacted 510 members and then leaked a third party in the
+  // changelog underneath, while its own note said it had not.
+  const redactChange = (e) =>
+    ourLabels.has(e.wallet.toLowerCase())
+      ? e
+      : { sourceKey: sourceKeyOf(e.wallet).toString(), tier: e.tier, label: e.label };
+
+  // The console has no hasher — it ships zero dependencies — so the leaf for each subject
+  // of the two-gate comparison is derived here, where keccak already lives. Membership is
+  // resolved against BOTH sets: the divergence the second gate exists to show is temporal,
+  // and it is invisible without the root that came before.
+  const prevKeys = new Set((previous?.members ?? []).map((m) => m.sourceKey));
+  const nowKeys = new Set(out.members.map((m) => m.sourceKey));
+  const CONSOLE_SUBJECTS = [
+    "0x000000000000000000000000000000000000dEaD",
+    "0x1111111111111111111111111111111111111111",
+    ...[...ourLabels],
+    ...dropped.map((d) => d.wallet),
+  ];
+  const subjects = [...new Set(CONSOLE_SUBJECTS.map((a) => a.toLowerCase()))].map((a) => {
+    const k = sourceKeyOf(a).toString();
+    return { address: a, sourceKey: k, inSet: nowKeys.has(k), inPreviousSet: prevKeys.has(k) };
+  });
+
   const publicOut = {
     ...out,
     members: out.members.map((m) =>
@@ -191,6 +225,9 @@ if (isCli && cmd === "build") {
         ? m
         : { index: m.index, sourceKey: m.sourceKey, tier: m.tier, countries: m.countries },
     ),
+    dropped: dropped.map(redactChange),
+    added: added.map(redactChange),
+    subjects,
     note:
       "Members not operated by this project are published as leaves only. The set is built " +
       "from a sandbox shared across teams; their wallet addresses are not ours to republish.",

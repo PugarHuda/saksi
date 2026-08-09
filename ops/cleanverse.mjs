@@ -72,6 +72,9 @@ export class Cleanverse {
     });
     const text = await res.text();
     let body;
+    // A transport failure carries no business code, so checking the code first turned
+    // every 500 into "[undefined] undefined" and hid which field the server rejected.
+    if (!res.ok) throw new Error(`${path}: HTTP ${res.status} ${text.slice(0, 200)}`);
     try { body = JSON.parse(text); }
     catch { throw new Error(`${path}: HTTP ${res.status}, non-JSON body: ${text.slice(0, 200)}`); }
     // HTTP 200 with a non-zero code is a business failure, not a transport failure.
@@ -162,10 +165,13 @@ export class Cleanverse {
 
   launchWrappedAtoken(params) { return this.post("atoken/launch_wrapped_atoken", params); }
 
-  atokenRules(chain, contract_address) { return this.post("atoken/rules", { chain, contract_address }); }
+  // atoken_address, not contract_address. The validator endpoints take the latter, these
+  // take the former, and the wrong name returns HTTP 500 — invisible until post() started
+  // reporting the status, because a 500 body carries no `code`.
+  atokenRules(chain, atoken_address) { return this.post("atoken/rules", { chain, atoken_address }); }
 
-  addAtokenRule(chain, contract_address, rule) {
-    return this.post("atoken/add_rule", { chain, contract_address, rule });
+  addAtokenRule(chain, atoken_address, rule) {
+    return this.post("atoken/add_rule", { chain, atoken_address, rule });
   }
 
   applyStatus(requestId) { return this.get(`atoken/query_apply_status/${requestId}`); }

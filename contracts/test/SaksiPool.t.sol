@@ -225,12 +225,12 @@ contract SaksiPoolTest is Test {
 
     function test_OwnerManagesThePerimeter() public {
         IAPassComplianceValidator.RuleV2 memory r =
-            IAPassComplianceValidator.RuleV2(bytes2(0), bytes2(0), 30, 0, 0);
+            IAPassComplianceValidator.RuleV2(bytes2(0), bytes2(0), 30, 0, false, 0);
         pool.setRule(r);
         assertEq(pool.activeRules().length, 1);
         assertEq(pool.activeRules()[0].minTier, 30);
 
-        pool.addRule(IAPassComplianceValidator.RuleV2(bytes2(0), bytes2(0), 50, 0, 0));
+        pool.addRule(IAPassComplianceValidator.RuleV2(bytes2(0), bytes2(0), 50, 0, false, 0));
         assertEq(pool.activeRules().length, 2);
 
         vm.prank(address(0xBAD));
@@ -352,18 +352,24 @@ contract SaksiPoolTest is Test {
         pool.transact(pA, pB, pC, s, holder, address(0), 0);
     }
 
+    function _cl(uint8 k, uint256 a) internal pure returns (bytes32) { return keccak256(abi.encode(k, a)); }
+    function _cl2(uint8 k, uint256 a, uint256 b) internal pure returns (bytes32) {
+        return keccak256(abi.encode(k, a, b));
+    }
+
     // ---- answerability -----------------------------------------------------
 
     function test_OnlyAuditorRaisesRequest() public {
         // Read the constant before the prank: an external call would consume it and the
         // revert would never be reached.
         uint8 threshold = pool.KIND_THRESHOLD();
+        bytes32 cl = _cl(threshold, 1_000e6);
 
         vm.prank(address(0xBAD));
         vm.expectRevert(SaksiPool.NotAuditor.selector);
-        pool.requestAudit(77, 1, threshold, "concentration cap");
+        pool.requestAudit(77, 1, threshold, cl, "concentration cap");
 
-        pool.requestAudit(77, 1, threshold, "concentration cap");
+        pool.requestAudit(77, 1, threshold, cl, "concentration cap");
         assertTrue(pool.auditRequested(77));
         assertEq(pool.auditSubject(77), 1);
         assertEq(pool.auditKind(77), threshold);
@@ -381,7 +387,7 @@ contract SaksiPoolTest is Test {
 
     function test_ThresholdDisclosureAnswersAndClosesTheRequest() public {
         _deposit(holder, bytes32(uint256(31)), 50e6);
-        pool.requestAudit(4243, 31, pool.KIND_THRESHOLD(), "no holder above 1,000");
+        pool.requestAudit(4243, 31, pool.KIND_THRESHOLD(), _cl(pool.KIND_THRESHOLD(), 1_000e6), "no holder above 1,000");
         uint[3] memory s = [uint256(31), 1_000e6, 4243];
 
         pool.proveThreshold(pA, pB, pC, s);
@@ -394,7 +400,7 @@ contract SaksiPoolTest is Test {
 
     /// A disclosure must be about a position this register actually holds.
     function test_DisclosureAboutUnknownCommitmentRejected() public {
-        pool.requestAudit(4244, 0xDEAD, pool.KIND_THRESHOLD(), "unknown note");
+        pool.requestAudit(4244, 0xDEAD, pool.KIND_THRESHOLD(), _cl(pool.KIND_THRESHOLD(), 1_000e6), "unknown note");
         uint[3] memory s = [uint256(0xDEAD), 1_000e6, 4244];
         vm.expectRevert(SaksiPool.UnknownCommitment.selector);
         pool.proveThreshold(pA, pB, pC, s);
@@ -402,7 +408,7 @@ contract SaksiPoolTest is Test {
 
     function test_RangeDisclosure() public {
         _deposit(holder, bytes32(uint256(32)), 50e6);
-        pool.requestAudit(4245, 32, pool.KIND_RANGE(), "reportable bracket");
+        pool.requestAudit(4245, 32, pool.KIND_RANGE(), _cl2(pool.KIND_RANGE(), 10e6, 100e6), "reportable bracket");
         uint[4] memory s = [uint256(32), 10e6, 100e6, 4245];
         pool.proveRange(pA, pB, pC, s);
         assertEq(pool.auditAnswered(4245), pool.KIND_RANGE());
@@ -411,7 +417,7 @@ contract SaksiPoolTest is Test {
     function test_AggregateDisclosureChecksActiveSlotsOnly() public {
         _deposit(holder, bytes32(uint256(40)), 10e6);
         _deposit(holder, bytes32(uint256(41)), 20e6);
-        pool.requestAudit(4246, 0, pool.KIND_AGGREGATE(), "jurisdiction exposure");
+        pool.requestAudit(4246, 0, pool.KIND_AGGREGATE(), _cl(pool.KIND_AGGREGATE(), 500e6), "jurisdiction exposure");
 
         uint[13] memory s;
         s[0] = 40; s[1] = 41; s[2] = 0xBEEF; s[3] = 0; s[4] = 0;   // slot 2 is padding
@@ -426,7 +432,7 @@ contract SaksiPoolTest is Test {
 
     function test_AggregateRejectsActiveSlotNotInRegister() public {
         _deposit(holder, bytes32(uint256(42)), 10e6);
-        pool.requestAudit(4247, 0, pool.KIND_AGGREGATE(), "jurisdiction exposure");
+        pool.requestAudit(4247, 0, pool.KIND_AGGREGATE(), _cl(pool.KIND_AGGREGATE(), 500e6), "jurisdiction exposure");
 
         uint[13] memory s;
         s[0] = 42; s[1] = 0xBEEF;                 // slot 1 is not a known commitment
@@ -439,7 +445,7 @@ contract SaksiPoolTest is Test {
 
     function test_ExactDisclosure() public {
         _deposit(holder, bytes32(uint256(50)), 25e6);
-        pool.requestAudit(4248, 50, pool.KIND_EXACT(), "exact position");
+        pool.requestAudit(4248, 50, pool.KIND_EXACT(), bytes32(0), "exact position");
         uint[3] memory s = [uint256(50), 25e6, 4248];
         pool.proveExact(pA, pB, pC, s);
         assertEq(pool.auditAnswered(4248), pool.KIND_EXACT());
@@ -454,7 +460,7 @@ contract SaksiPoolTest is Test {
         asset.mint(address(0xA77ACC), 1);
         _deposit(address(0xA77ACC), bytes32(uint256(61)), 1); // the attacker's throwaway
 
-        pool.requestAudit(4250, 60, pool.KIND_THRESHOLD(), "is position 60 under the cap");
+        pool.requestAudit(4250, 60, pool.KIND_THRESHOLD(), _cl(pool.KIND_THRESHOLD(), 1_000e6), "is position 60 under the cap");
 
         uint[3] memory theirs = [uint256(61), type(uint64).max, 4250];
         vm.prank(address(0xA77ACC));
@@ -469,7 +475,7 @@ contract SaksiPoolTest is Test {
     /// An exact-disclosure demand must not be satisfiable by a weaker statement.
     function test_KindCannotBeDowngraded() public {
         _deposit(holder, bytes32(uint256(62)), 50e6);
-        pool.requestAudit(4251, 62, pool.KIND_EXACT(), "disclose position 62 in full");
+        pool.requestAudit(4251, 62, pool.KIND_EXACT(), bytes32(0), "disclose position 62 in full");
         vm.expectRevert(SaksiPool.WrongDisclosureKind.selector);
         pool.proveThreshold(pA, pB, pC, [uint256(62), type(uint64).max, 4251]);
     }

@@ -11,7 +11,13 @@ const pad = (a: string) => a.replace(/^0x/, "").toLowerCase().padStart(64, "0");
 const BURN = "0x000000000000000000000000000000000000dEaD";
 const ONES = "0x1111111111111111111111111111111111111111";
 
-type Row = { address: string; name: string; gate1: boolean | null; gate2: boolean };
+type Row = {
+  address: string;
+  name: string;
+  gate1: boolean | null;
+  gate2: boolean;
+  gate2Prev: boolean | null;   // null = no earlier set on record
+};
 
 export default function GatesView({
   deployment,
@@ -28,7 +34,11 @@ export default function GatesView({
     [ONES, "0x1111…1111"],
     ...(deployment.issuer ? ([[deployment.issuer, "issuer"]] as [string, string][]) : []),
     ...(deployment.pool ? ([[deployment.pool, "the pool contract itself"]] as [string, string][]) : []),
-    ...((asp?.dropped ?? []).map((d) => [d.wallet, `revoked · ${d.label ?? "holder"}`]) as [string, string][]),
+    // Only our own dropped credentials carry an address now — a third party's wallet is
+    // published as a leaf, and there is nothing to ask the validator about.
+    ...((asp?.dropped ?? [])
+      .filter((d) => !!d.wallet)
+      .map((d) => [d.wallet, `revoked · ${d.label ?? "holder"}`]) as [string, string][]),
   ];
 
   const load = useCallback(async () => {
@@ -43,8 +53,13 @@ export default function GatesView({
     }
     setError(null);
     try {
-      const inSet = (a: string) =>
-        asp.members.some((m) => m.wallet.toLowerCase() === a.toLowerCase());
+      // Membership is a property of the LEAF, not of an address the published set no
+      // longer carries. Comparing on m.wallet threw on the 510 leaf-only members; making
+      // it optional would answer "no witness" for every subject and print the burn-address
+      // claim this project formally retracted. sourceKey is precomputed by ops/asp.mjs,
+      // where keccak already lives, because this console ships no hasher.
+      const keyOf = (a: string) =>
+        asp.subjects?.find((s) => s.address.toLowerCase() === a.toLowerCase());
 
       const out = await Promise.all(
         subjects.map(async ([address, name]) => {
@@ -69,7 +84,14 @@ export default function GatesView({
           } catch {
             gate1 = null;
           }
-          return { address, name, gate1, gate2: inSet(address) };
+          const s = keyOf(address);
+          return {
+            address,
+            name,
+            gate1,
+            gate2: s?.inSet ?? false,
+            gate2Prev: s ? s.inPreviousSet : null,
+          };
         }),
       );
       setRows(out);
@@ -85,6 +107,9 @@ export default function GatesView({
   }, [load]);
 
   const disagreements = rows?.filter((r) => (r.gate1 === true) !== r.gate2) ?? [];
+  // Refused live, but the previous anchored root still admits them. This is the temporal
+  // divergence the two gates exist for, and it is invisible without the earlier set.
+  const stale = rows?.filter((r) => r.gate1 === false && r.gate2Prev === true) ?? [];
 
   return (
     <div className="grid">
@@ -115,7 +140,8 @@ export default function GatesView({
               <tr>
                 <th scope="col">Subject</th>
                 <th scope="col">Gate 1 · Cleanverse Validator</th>
-                <th scope="col">Gate 2 · association set</th>
+                <th scope="col">Gate 2 · set now</th>
+                <th scope="col">Gate 2 · set before the last rebuild</th>
                 <th scope="col">Enters the register?</th>
               </tr>
             </thead>
@@ -124,6 +150,7 @@ export default function GatesView({
                 ? subjects.map(([a]) => (
                     <tr key={a}>
                       <td><Skeleton w="12em" /></td>
+                      <td><Skeleton w="6em" /></td>
                       <td><Skeleton w="6em" /></td>
                       <td><Skeleton w="6em" /></td>
                       <td><Skeleton w="4em" /></td>
@@ -154,6 +181,15 @@ export default function GatesView({
                           )}
                         </td>
                         <td>
+                          {r.gate2Prev === null ? (
+                            <span className="note">—</span>
+                          ) : r.gate2Prev ? (
+                            <Badge tone="warn">admits</Badge>
+                          ) : (
+                            <Badge tone="no">no witness</Badge>
+                          )}
+                        </td>
+                        <td>
                           {r.gate1 === true && r.gate2 ? (
                             <Badge tone="ok">yes</Badge>
                           ) : (
@@ -171,30 +207,41 @@ export default function GatesView({
       {rows && (
         <section className="card">
           <h2>What the comparison found</h2>
-          {disagreements.length === 0 ? (
+          {stale.length > 0 ? (
+            <p className="callout">
+              <strong>{stale.map((d) => d.name).join(", ")}</strong> is refused by Cleanverse
+              right now, holds no witness in the current set — and{" "}
+              <strong>is still admitted by the root anchored before the last rebuild</strong>.
+              That is the window the live gate exists to close: between a credential changing
+              and the issuer rotating the root, the anchored set is stale by construction. The
+              live call refuses them today; the anchored set is what still binds when an
+              operator never rotates. Neither gate subsumes the other.
+            </p>
+          ) : disagreements.length === 0 ? (
             <p style={{ margin: 0 }}>
-              The gates agree on every subject checked right now. Re-run after a credential
-              changes — the interesting cases appear between a freeze and a rebuild.
+              The gates agree on every subject checked right now, which is the correct result:
+              the set is built from the registry, so it is never more permissive than it. The
+              divergence this tab exists to show is temporal — freeze a credential without
+              rotating the root and it appears in the last column.
             </p>
           ) : (
-            <>
-              <p className="callout">
-                Cleanverse&apos;s validator answers that{" "}
-                <strong>{disagreements.map((d) => d.name).join(", ")}</strong>{" "}
-                {disagreements.length === 1 ? "satisfies" : "satisfy"} this pool&apos;s rule.
-                Someone in the shared sandbox issued that address a credential, so gate one
-                admits it. Gate two has no membership witness for it, so no proof exists and it
-                does not enter.
-              </p>
-              <p className="note" style={{ margin: "12px 0 0" }}>
-                The honest half of the same result: <code className="mono">0x1111…1111</code> is
-                in our set, because it is in the registry. The association set is faithful to
-                Cleanverse, not cleaner than it. What the second gate adds is not better
-                identity data — it is a second, independent question, anchored by the issuer at
-                a point in time, that an address has to satisfy as well.
-              </p>
-            </>
+            <p className="callout">
+              <strong>{disagreements.map((d) => d.name).join(", ")}</strong>{" "}
+              {disagreements.length === 1 ? "is" : "are"} answered differently by the two gates
+              as of this moment. Read the last column before drawing a conclusion: a subject
+              the live call refuses while the previous root admits is the stale window, not a
+              defect in either gate.
+            </p>
           )}
+
+          <p className="note" style={{ margin: "12px 0 0" }}>
+            An earlier version of this panel pointed at the burn address and claimed the ZK
+            gate caught what the live gate missed. That was our own bug: a status filter had
+            removed seven eighths of the eligible population, and{" "}
+            <code className="mono">0x…dEaD</code> fell out because of it. With the population
+            enumerated correctly both gates admit it. The set is faithful to the registry, and
+            never more permissive than it.
+          </p>
           <p className="note" style={{ margin: "12px 0 0" }}>
             Reproduce from a terminal: <code className="mono">node ops/gate-gap.mjs</code>
           </p>

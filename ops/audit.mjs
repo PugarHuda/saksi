@@ -88,6 +88,12 @@ async function proveAndSend({ circuit, input, selector, sig, question, ctx, kind
   try {
     ({ proof, publicSignals } = await snarkjs.groth16.fullProve(input, wasm, zkey));
   } catch (e) {
+    // Only an unsatisfiable constraint is an ANSWER. A missing wasm, an unset signal or a
+    // path typo throws into this same catch, and every one of them was being published as
+    // "no proof exists for this claim" — a permanent, substantive statement about someone's
+    // position, written by a broken toolchain rather than by the arithmetic.
+    if (!/Assert Failed/i.test(e.message ?? "")) throw e;
+
     // A cap that actually binds has no witness. The register cannot answer "yes" to a
     // question whose answer is no — there is no proof to produce, so the request stays
     // open on-chain and the failure is the honest outcome rather than an error.

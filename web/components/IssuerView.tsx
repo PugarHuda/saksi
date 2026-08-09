@@ -247,10 +247,20 @@ export default function IssuerView({
                 </thead>
                 <tbody>
                   {asp.members.slice(0, 12).map((m) => (
-                    <tr key={m.wallet}>
+                    <tr key={m.index}>
                       <td className="mono">{m.index}</td>
                       <td>
-                        <Addr value={m.wallet} />
+                        {/* The published set carries an address only for members this
+                            project operates; everyone else is a leaf, which is all the
+                            circuit ever sees. Rendering Addr on the absent field threw
+                            inside render and took the whole tab down in production. */}
+                        {m.wallet ? (
+                          <Addr value={m.wallet} />
+                        ) : (
+                          <span className="mono" title="published as a leaf only">
+                            leaf {short(m.sourceKey, 8, 6)}
+                          </span>
+                        )}
                         {m.label && (
                           <span className="note" style={{ display: "inline", marginLeft: 8 }}>
                             {m.label}

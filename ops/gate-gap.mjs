@@ -121,5 +121,62 @@ if (staleWindow.length) {
   console.log("The set was rebuilt after the last credential change, so no holder is currently");
   console.log("caught in the window. Freeze a credential without rotating the root to see it.");
 }
-console.log("\nThe set is faithful to the registry, never cleaner than it: an address Cleanverse");
-console.log("credentials is an address this set admits.");
+// ---------------------------------------------------------------------------
+// The sweep.
+//
+// Everything above compares a handful of hand-picked addresses, and for a while it
+// printed "0 disagreements" and a closing line asserting the set was faithful to the
+// registry. It was reporting on four subjects and calling it a property of five hundred.
+// The set at that moment contained fifteen wallets Cleanverse had frozen.
+//
+// So ask the validator about EVERY member. The direction matters: a member the validator
+// refuses is the set being more permissive than the compliance provider, which inverts
+// the safety direction the whole design rests on.
+
+const members = asp.members ?? [];
+const CONC = 4; // the public RPC rate-limits well below this on bursts
+let cursor = 0;
+const refused = [];
+let unanswered = 0;
+
+async function worker() {
+  for (;;) {
+    const i = cursor++;
+    if (i >= members.length) return;
+    const m = members[i];
+    if (!m.wallet) continue; // a leaf-only member is not addressable here
+    try {
+      const ok = call(dep.validator, "complianceVerify(address,address)(bool)", dep.pool, m.wallet);
+      if (ok.trim() !== "true") refused.push(m);
+    } catch {
+      unanswered++;
+    }
+    if (i % 50 === 0) process.stdout.write(`\r  swept ${i}/${members.length}`);
+  }
+}
+
+console.log(`\nsweeping all ${members.length} members against Cleanverse's validator…`);
+await Promise.all(Array.from({ length: CONC }, worker));
+process.stdout.write(`\r  swept ${members.length}/${members.length}\n\n`);
+
+if (unanswered) {
+  console.log(`${unanswered} member(s) the validator would not answer about — counted as unknown,`);
+  console.log("not as agreement. A rate-limited read must not be reported as a clean result.\n");
+}
+
+if (refused.length === 0) {
+  console.log(`All ${members.length - unanswered} answered members are admitted by Cleanverse too.`);
+  console.log("The set is faithful to the registry and never more permissive than it.");
+} else {
+  console.log(`${refused.length} member(s) hold a witness in this set that Cleanverse REFUSES:`);
+  for (const m of refused.slice(0, 20)) {
+    console.log(`  ${m.wallet}  tier ${m.tier}  ${label(m.wallet) || m.label || ""}`);
+  }
+  if (refused.length > 20) console.log(`  … and ${refused.length - 20} more`);
+  console.log("");
+  console.log("That is the set being MORE permissive than the compliance provider, which is the");
+  console.log("one direction it must never be. Gate one still refuses them at deposit, so no");
+  console.log("position was ever opened this way — but the anchored root is supposed to be a");
+  console.log("snapshot of eligibility, and a snapshot that admits frozen credentials is wrong.");
+  process.exitCode = 1;
+}

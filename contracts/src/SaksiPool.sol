@@ -37,12 +37,19 @@ interface IVerifier13 {
 ///
 /// Monad testnet: 0xaC7e5179C2C7f03f209136886c172eb34F161792
 interface IAPassComplianceValidator {
+    /// Six fields, in this order. An earlier version of this interface omitted
+    /// `isBlackList`, which Cleanverse published on 9 Aug. The omission was invisible in
+    /// `getRulesV2` only by luck — our rule carries `isBlackList = false` and a zero
+    /// bitmap, so the short decode read one zero where another belonged — but it made
+    /// `setRuleV2FromContract` encode five words for a validator that decodes six, so the
+    /// rule-management calls below could never have succeeded against the live contract.
     struct RuleV2 {
         bytes2 allowedGroup;        // empty = unrestricted
         bytes2 allowedSubGroup;
         uint8 minTier;              // 0 = unrestricted
         uint8 minSubTier;
-        uint256 poolCountryBitmap;  // 0 = unrestricted
+        bool isBlackList;           // true = `countryBitmap` is a deny list, not an allow list
+        uint256 countryBitmap;      // 0 = unrestricted
     }
 
     /// Reverts if `poolAddress` was never registered — an unregistered pool cannot
@@ -86,8 +93,17 @@ abstract contract Ownable {
 
 /// Saksi — a confidential holder register for a tokenized real-world asset.
 ///
-/// Positions in a Cleanverse Verified Asset are held as commitments, so amount and
-/// holder are hidden on-chain. The register stays answerable at both edges:
+/// Positions in a Cleanverse Verified Asset are held as commitments. The register stays
+/// answerable at both edges:
+///
+/// What the commitment does NOT hide, stated plainly because a reader with the event log
+/// can check it in a minute: an ENTRY is public. `deposit` takes `amount` as a plaintext
+/// argument, the depositor is `msg.sender`, and both are emitted in `Deposited` alongside
+/// the ERC20 Transfer log. So the map from a commitment to its opening amount and its
+/// first owner is readable by anyone until that position MOVES. Breaking that link is
+/// exactly what `transact` below is for — and it needs a published note root to be
+/// reachable at all. The confidentiality this register earns is over a position's life,
+/// not at the moment it is created.
 ///
 ///   ENTRY is gated twice over.
 ///     1. Cleanverse's own Validator contract, which this pool is registered with,
@@ -164,6 +180,7 @@ contract SaksiPool is Ownable {
     mapping(uint256 => uint8) public auditAnswered;   // 0 = open, else DisclosureKind
     mapping(uint256 => uint256) public auditSubject;  // the commitment asked about; 0 = a set
     mapping(uint256 => uint8) public auditKind;       // the answer the auditor will accept
+    mapping(uint256 => bytes32) public auditClaim;    // the figure asked about, hashed
 
     bool public paused;
 
@@ -180,7 +197,12 @@ contract SaksiPool is Ownable {
     event NoteRootPublished(uint256 indexed previousRoot, uint256 indexed newRoot);
     event DenyListSet(uint256[DENY_SLOTS] denyList);
     event AuditRequested(
-        uint256 indexed contextHash, address indexed by, uint256 subject, uint8 kind, string question
+        uint256 indexed contextHash,
+        address indexed by,
+        uint256 subject,
+        uint8 kind,
+        bytes32 claim,
+        string question
     );
     event DisclosureProved(uint256 indexed contextHash, uint8 kind, uint256 a, uint256 b);
     event PausedSet(bool paused);
@@ -208,6 +230,7 @@ contract SaksiPool is Ownable {
     error DuplicateOutput();
     error WrongDisclosureKind();
     error WrongSubject();
+    error WrongClaim();
     error FeeWithoutWithdrawal();
     error ExceedsBacking();
 
@@ -325,6 +348,10 @@ contract SaksiPool is Ownable {
     /// malicious — has no undo. The association set has retireRoot; this is its twin.
     function retireNoteRoot(uint256 root) external onlyOwner {
         knownNoteRoot[root] = false;
+        // Leaving noteRoot pointing at a root transact() now refuses would have the
+        // console advertising a root the register will not accept.
+        if (root == noteRoot) noteRoot = 0;
+        emit NoteRootPublished(root, noteRoot);
     }
 
     function setDenyList(uint256[DENY_SLOTS] calldata list) external onlyOwner {
@@ -333,6 +360,7 @@ contract SaksiPool is Ownable {
     }
 
     function setAuditor(address who) external onlyOwner {
+        if (who == address(0)) revert NotAuditor();
         auditor = who;
         emit AuditorSet(who);
     }
@@ -413,7 +441,15 @@ contract SaksiPool is Ownable {
         commitments.push(commitment);
 
         // ponytail: no fee logic. Add a take-rate here when there is a pilot to charge.
+        //
+        // Measure what arrived rather than trusting the argument. The commitment binds
+        // `amount`, but the CVA is a Cleanverse A-Token whose implementation this register
+        // does not control: on any token that skims, rebases, or otherwise delivers less
+        // than it was asked for, the commitment would bind more than the pool holds and
+        // the JoinSplit would conserve the gap on its way out.
+        uint256 before = asset.balanceOf(address(this));
         require(asset.transferFrom(msg.sender, address(this), amount), "transferFrom failed");
+        if (asset.balanceOf(address(this)) - before != amount) revert AmountNotBound();
         emit Deposited(commitment, amount, msg.sender, leafIndex);
         emit CommitmentInserted(commitment, leafIndex);
     }
@@ -466,7 +502,7 @@ contract SaksiPool is Ownable {
 
         bytes32 nA = bytes32(pubSignals[3]);
         bytes32 nB = bytes32(pubSignals[4]);
-        if (nullifierUsed[nA] || nullifierUsed[nB]) revert NullifierUsed();
+        if (nA == nB || nullifierUsed[nA] || nullifierUsed[nB]) revert NullifierUsed();
         nullifierUsed[nA] = true;
         nullifierUsed[nB] = true;
 
@@ -517,23 +553,66 @@ contract SaksiPool is Ownable {
     ///
     /// `subject` is the commitment the question is about; pass 0 for an aggregate, where
     /// the circuit's own context hash already pins the whole set.
-    function requestAudit(uint256 contextHash, uint256 subject, uint8 kind, string calldata question)
-        external
-    {
+    ///
+    /// `claim` pins the FIGURE, and without it the rest of this is decoration. Pinning the
+    /// subject and the kind still let a holder answer "is this position at most 1,000?"
+    /// with a proof that it is at most 2^64-1 — true, provable, and it closes the request
+    /// forever with the record reading ANSWERED. The bound is not incidental: the circuits
+    /// range-check the threshold to 64 bits and the aggregate cap to 72, so the vacuous
+    /// claim always has a witness. Until this hash was checked, the number the auditor
+    /// actually asked for lived only in `question`, which nothing verifies.
+    ///
+    /// Build it with `claimHash`. An exact disclosure takes no figure, so its claim is 0.
+    function requestAudit(
+        uint256 contextHash,
+        uint256 subject,
+        uint8 kind,
+        bytes32 claim,
+        string calldata question
+    ) external {
         if (msg.sender != auditor) revert NotAuditor();
         if (kind == 0 || kind > KIND_AGGREGATE) revert NoSuchAudit();
+        // Context 0 is the entry-binding domain. A deposit's binding proof carries public
+        // signals [commitment, amount, 0] and is verified by this same exact verifier, so
+        // an audit registered here would be answerable by replaying calldata that is
+        // already public — by anyone, not just the holder.
+        if (contextHash == 0) revert NoSuchAudit();
+        // Answers are permanent, so re-asking on a spent context would create a request
+        // that can never be satisfied. Fail here rather than at answering time.
+        if (auditAnswered[contextHash] != 0) revert AuditClosed();
+        if (subject >= FIELD) revert WrongSubject();
+        // An aggregate is named by its context hash, not by one commitment; a non-zero
+        // subject here would be unanswerable.
+        if (kind == KIND_AGGREGATE && subject != 0) revert WrongSubject();
+        if (kind == KIND_EXACT && claim != bytes32(0)) revert WrongClaim();
+
         auditRequested[contextHash] = true;
         auditSubject[contextHash] = subject;
         auditKind[contextHash] = kind;
-        emit AuditRequested(contextHash, msg.sender, subject, kind, question);
+        auditClaim[contextHash] = claim;
+        emit AuditRequested(contextHash, msg.sender, subject, kind, claim, question);
     }
 
-    /// Open, of the right kind, and about the position the auditor actually asked about.
-    function _openAudit(uint256 contextHash, uint256 subject, uint8 kind) internal view {
+    /// The figure the auditor named, hashed the way the provers below recompute it.
+    /// Threshold: `claimHash(KIND_THRESHOLD, cap, 0)`. Range: `(KIND_RANGE, lower, upper)`.
+    /// Aggregate: `(KIND_AGGREGATE, cap, 0)`. Exact takes no figure and hashes to 0.
+    function claimHash(uint8 kind, uint256 a, uint256 b) public pure returns (bytes32) {
+        if (kind == KIND_EXACT) return bytes32(0);
+        if (kind == KIND_RANGE) return keccak256(abi.encode(kind, a, b));
+        return keccak256(abi.encode(kind, a));
+    }
+
+    /// Open, of the right kind, about the position the auditor asked about, and answering
+    /// the figure they asked for.
+    function _openAudit(uint256 contextHash, uint256 subject, uint8 kind, bytes32 claim)
+        internal
+        view
+    {
         if (!auditRequested[contextHash]) revert NoSuchAudit();
         if (auditAnswered[contextHash] != 0) revert AuditClosed();
         if (auditKind[contextHash] != kind) revert WrongDisclosureKind();
         if (auditSubject[contextHash] != subject) revert WrongSubject();
+        if (auditClaim[contextHash] != claim) revert WrongClaim();
     }
 
     function _requireKnown(uint256 commitment) internal view {
@@ -545,7 +624,7 @@ contract SaksiPool is Ownable {
     function proveExact(
         uint[2] calldata pA, uint[2][2] calldata pB, uint[2] calldata pC, uint[3] calldata s
     ) external {
-        _openAudit(s[2], s[0], KIND_EXACT);
+        _openAudit(s[2], s[0], KIND_EXACT, bytes32(0));
         _requireKnown(s[0]);
         if (!exactVerifier.verifyProof(pA, pB, pC, s)) revert InvalidProof();
         auditAnswered[s[2]] = KIND_EXACT;
@@ -558,7 +637,7 @@ contract SaksiPool is Ownable {
     function proveThreshold(
         uint[2] calldata pA, uint[2][2] calldata pB, uint[2] calldata pC, uint[3] calldata s
     ) external {
-        _openAudit(s[2], s[0], KIND_THRESHOLD);
+        _openAudit(s[2], s[0], KIND_THRESHOLD, claimHash(KIND_THRESHOLD, s[1], 0));
         _requireKnown(s[0]);
         if (!thresholdVerifier.verifyProof(pA, pB, pC, s)) revert InvalidProof();
         auditAnswered[s[2]] = KIND_THRESHOLD;
@@ -570,7 +649,7 @@ contract SaksiPool is Ownable {
     function proveRange(
         uint[2] calldata pA, uint[2][2] calldata pB, uint[2] calldata pC, uint[4] calldata s
     ) external {
-        _openAudit(s[3], s[0], KIND_RANGE);
+        _openAudit(s[3], s[0], KIND_RANGE, claimHash(KIND_RANGE, s[1], s[2]));
         _requireKnown(s[0]);
         if (!rangeVerifier.verifyProof(pA, pB, pC, s)) revert InvalidProof();
         auditAnswered[s[3]] = KIND_RANGE;
@@ -586,7 +665,7 @@ contract SaksiPool is Ownable {
     ) external {
         // Subject 0: the set is named by the context hash the circuit itself recomputes,
         // so there is no single commitment for the auditor to have pinned.
-        _openAudit(s[11], 0, KIND_AGGREGATE);
+        _openAudit(s[11], 0, KIND_AGGREGATE, claimHash(KIND_AGGREGATE, s[10], 0));
         for (uint256 i = 0; i < AGG_SLOTS; i++) {
             uint256 flag = s[AGG_SLOTS + i];
             if (flag > 1) revert NotBoolean();

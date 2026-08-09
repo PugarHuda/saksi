@@ -106,8 +106,8 @@ export default function RegulatorView({
                         marginBottom: 8,
                       }}
                     >
-                      <Badge tone={a.verified ? "ok" : "no"}>
-                        {a.verified ? "Verified on chain" : "Refused"}
+                      <Badge tone={a.verified ? "ok" : "warn"}>
+                        {a.verified ? "Verified on chain" : "Open — no proof exists"}
                       </Badge>
                       <strong style={{ fontSize: 14 }}>{copy.title} disclosure</strong>
                       <span className="note" style={{ display: "inline", marginLeft: "auto" }}>
