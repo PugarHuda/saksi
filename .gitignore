@@ -12,3 +12,6 @@ web/out/
 *.wtns
 
 web/.vercel/
+
+# Holder secrets that open a commitment. The redacted index is notes.public.json.
+notes.json
