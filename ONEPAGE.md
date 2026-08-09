@@ -1,7 +1,5 @@
 # Saksi — a confidential holder register for tokenized real-world assets
 
-**Pool** `0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA` · **Auditor** `0x63CB403b716111c249d4D11312c15c5744CcC4e4`, a different key from the issuer — which is what makes the request-before-answer record worth anything.
-
 **Live** saksi-gilt.vercel.app · **Repo** github.com/PugarHuda/saksi · **Monad testnet, chain ID 10143** · Cleanverse CVI + CVA. Every figure below is printed by a command in this repo; the chain overrules any document.
 
 ## Problem — measured, not asserted
@@ -24,7 +22,7 @@ Positions are commitments moving by JoinSplit, so amounts and owners are never p
 
 ## Deployed — Monad testnet, chain ID 10143
 
-**SaksiPool** `0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA` · **our CVA** `0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B` · **Cleanverse CVI Compliance Validator** `0xaC7e5179C2C7f03f209136886c172eb34F161792` · six Groth16 verifiers beside the pool — compliance `0xd991…31fd`, transfer `0xa98c…5d61`, exact `0x2960…2563`, threshold `0xfb6a…cad7`, range `0x2b81…6a1e`, aggregate `0x7e76…3b69` (full addresses in `deployment.json`). Verify it yourself: `cast call <pool> "isEligible(address)(bool)" <wallet>` on `https://testnet-rpc.monad.xyz` returns Cleanverse's verdict, forwarded by the pool.
+**SaksiPool** `0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA` · **our CVA** `0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B` · **Cleanverse CVI Compliance Validator** `0xaC7e5179C2C7f03f209136886c172eb34F161792` · **auditor** `0x63CB403b716111c249d4D11312c15c5744CcC4e4`, not the issuer key · six Groth16 verifiers beside the pool (addresses in `deployment.json`). Verify it yourself: `cast call <pool> "isEligible(address)(bool)" <wallet>` on `https://testnet-rpc.monad.xyz` returns Cleanverse's verdict, forwarded by the pool.
 
 **State at block 52289375:** 12 commitments, 6 nullifiers spent, **6 live positions backing 2,315.000000 SAKSIAZEV**; three JoinSplits, one redeeming 50 out through a credentialed recipient and relayer; deposits from three credentialed EOAs. Eight audit requests, posted by an auditor key distinct from the issuer, **every request block earlier than its answer** (52210266 then 52210275; 52210345 then 52210355, disclosing 459.9); two are unanswerable and stay open — an aggregate over four positions summing to 1,680, asked whether they were at most 1,000. The register cannot answer falsely, only fail to answer. **173 Foundry tests pass**; `node ops/evidence.mjs` reprints it.
 
