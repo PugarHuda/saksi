@@ -104,6 +104,27 @@ if (isCli && cmd === "build") {
   // reproduces the same root.
   admitted.sort((a, b) => a.walletAddress.toLowerCase() < b.walletAddress.toLowerCase() ? -1 : 1);
 
+  // What changed since the last build. A revocation is only visible as a difference
+  // between two sets, so the difference is the artifact — without it an auditor asking
+  // "show me the holder being dropped" gets an empty answer.
+  const previous = fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, "utf8")) : null;
+  const nowIn = new Set(admitted.map((r) => r.walletAddress.toLowerCase()));
+  const dropped = (previous?.members ?? [])
+    .filter((m) => !nowIn.has(m.wallet.toLowerCase()))
+    .map((m) => ({ wallet: m.wallet, tier: m.tier, label: m.label ?? null }));
+  const added = previous
+    ? admitted
+        .filter((r) => !previous.members.some((m) => m.wallet.toLowerCase() === r.walletAddress.toLowerCase()))
+        .map((r) => ({ wallet: r.walletAddress, tier: r.tier, label: r.label ?? null }))
+    : [];
+
+  if (previous) {
+    fs.writeFileSync(
+      path.join(ROOT, "asp.previous.json"),
+      JSON.stringify(previous, null, 2) + "\n",
+    );
+  }
+
   const { h2 } = await makePoseidon();
   const leaves = admitted.map((r) => sourceKeyOf(r.walletAddress));
   if (leaves.length > (1 << LEVELS)) throw new Error(`${leaves.length} leaves exceeds 2^${LEVELS}`);
@@ -117,6 +138,9 @@ if (isCli && cmd === "build") {
     excluded: [...excluded],
     populationQueried: population.length,
     admitted: admitted.length,
+    previousRoot: previous?.root ?? null,
+    dropped,      // in the previous set, not in this one — this is what revocation looks like
+    added,
     root: tree.root.toString(),
     members: admitted.map((r, i) => ({
       index: i,

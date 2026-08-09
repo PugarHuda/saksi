@@ -114,20 +114,33 @@ cast call 0x9BB3af71497304506Be2810915016742394f72f2 "activeRules()((bytes2,byte
 cast call 0x9BB3af71497304506Be2810915016742394f72f2 "isEligible(address)(bool)" 0x4490CcB0abdE3D2E494dE5cC118F7D0D74b44639 --rpc-url https://testnet-rpc.monad.xyz
 ```
 
-## The two demonstrations
+## Three demonstrations
 
-**1. Prove without revealing.** Four disclosure types, all verified on-chain, in
-[`audit-log.json`](audit-log.json) with request and verification hashes for each. The
-strongest line in it is a failure: asked whether total exposure across four positions was
-at most 1,000 when it was in fact 1,150, **no proof could be produced**, and the request
-is still open on-chain. The register cannot answer a question falsely — it can only fail
-to answer.
+**1. The question comes first.** Four disclosure types, all verified on-chain, in
+[`audit-log.json`](audit-log.json). Every request block precedes its answer block — 52157468
+asks, 52157475 answers — which anyone can check with an RPC endpoint and no access to this
+repo. The strongest row is a failure: asked whether total exposure across four positions
+was at most 1,000 when it was in fact 1,150, **no proof could be produced**, and request
+`52163014` is still open. The register cannot answer falsely; it can only fail to answer.
 
-**2. Revoke and freeze.** A verified holder deposited, then had its A-Pass frozen at
-Cleanverse (`update_status` → live record `status: 2`). Both gates closed independently:
-`isEligible()` on Cleanverse's validator flipped `true → false`, and the association set
-rebuilt from 45 members to 44 without it. The next deposit reverts
-`ValidatorRefused(0xD578…)` at gate one and has no membership witness at gate two.
+**2. Why two gates.** `node ops/gate-gap.mjs` finds an address the gates disagree about.
+Cleanverse's own validator answers that the **burn address** satisfies this pool's rule —
+someone in the shared sandbox issued `0x…dEaD` a credential, and `complianceVerify` returns
+true for it today. Gate one admits it; gate two has no membership witness, so it does not
+enter. The honest half of the same result: `0x1111…1111` *is* in our set, because it is in
+the registry. The set is faithful to Cleanverse, not cleaner than it.
+
+**3. Revoke and freeze.** A verified holder deposited, then had its A-Pass frozen
+(`update_status` → live record `status: 2`). Both gates closed independently:
+`complianceVerify(pool, holder)` on Cleanverse's validator went `true → false`, and the
+association set rebuilt 47 → 46 without it — recorded in `asp.json` as
+`dropped: [{ label: "family", … }]`, with the previous set kept in `asp.previous.json`.
+The next deposit reverts `ValidatorRefused(0xa132…)` at gate one and has no witness at gate
+two.
+
+> `isEligible(address)` is **Saksi's** view on the pool, which forwards to Cleanverse's
+> `complianceVerify(pool, wallet)`. The validator itself exposes no `isEligible` — that
+> call reverts on their contract. The distinction matters when reproducing these results.
 
 ## Repository
 

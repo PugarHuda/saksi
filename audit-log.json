@@ -70,5 +70,17 @@
     "verified": true,
     "proveMs": 950,
     "at": "2026-08-09T06:20:00.396Z"
+  },
+  {
+    "kind": "aggregate",
+    "question": "is total exposure across all 5 registered positions at most 2,000 SAKSIAZEV?",
+    "circuit": "aggregateDisclosure",
+    "contextHash": "13010943287148225636499943233698377410223649789772178269111561739407044923419",
+    "answer": "yes — sum of 5 positions <= 2,000, no individual position disclosed",
+    "requestTx": "0x2ea30aea71dfdd6c98c0de942de2721435972ada55890200e96c1153b7df7ed2",
+    "verifyTx": "0x2fc76fa62543e8eacea17aeaef3e127e11b4d735a1f42bbf55e1c9403abcca5c",
+    "verified": true,
+    "proveMs": 1250,
+    "at": "2026-08-09T06:30:39.883Z"
   }
 ]
