@@ -11,7 +11,13 @@ Submitting **Saksi** for the RWA track.
 
 - **Repo:** https://github.com/PugarHuda/saksi
 - **Live demo:** https://saksi-gilt.vercel.app
-- **Summary:** [SUMMARY.md](https://github.com/PugarHuda/saksi/blob/main/SUMMARY.md) (also attached)
+- **One-page summary:** `ONEPAGE.pdf`, attached — problem, solution, CVI·CVA integration
+  points, deployed chain, on one page as asked. Also
+  [in the repo](https://github.com/PugarHuda/saksi/blob/main/ONEPAGE.md).
+- **The long version:** [SUMMARY.md](https://github.com/PugarHuda/saksi/blob/main/SUMMARY.md),
+  six pages, if you want the reasoning behind any line of the page above. Not a substitute for it.
+- **Deck:** [saksi-gilt.vercel.app/deck](https://saksi-gilt.vercel.app/deck) — fifteen slides,
+  every figure read from the same artefacts the console reads. Prints to PDF one slide per page.
 - **Demo video:** _[paste link]_
 - **Deployed chain:** Monad testnet, chain `10143`
 
@@ -132,6 +138,7 @@ Pugar Huda Mantoro
 ## Checklist before sending
 
 - [ ] Demo video recorded and linked (script in `DEMO.md`)
+- [ ] `ONEPAGE.pdf` attached — this is the one the brief asks for
 - [ ] `SUMMARY.md` attached as well as linked
 - [ ] Repo public and cloning anonymously
 - [ ] Live URL loading
