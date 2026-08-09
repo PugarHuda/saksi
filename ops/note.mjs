@@ -13,7 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
 import { makePoseidon } from "./merkle.mjs";
-import { ROOT } from "./env.mjs";
+import { ROOT, writeJson } from "./env.mjs";
 
 const FILE = path.join(ROOT, "notes.json");
 const FIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
@@ -59,10 +59,9 @@ export function saveNote(note, file = notesFile()) {
   const raw = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : all;
   // Preserve the recipient shape: a per-holder ledger is an object carrying its spending
   // key, and flattening it to a bare array would drop the key.
-  fs.writeFileSync(
-    file,
-    JSON.stringify(Array.isArray(raw) ? all : { ...raw, notes: all }, null, 2) + "\n",
-  );
+  // writeJson, not writeFileSync: this file is the only copy of every position's blinding,
+  // and a truncated write loses all of them, not just the one being appended.
+  writeJson(file, Array.isArray(raw) ? all : { ...raw, notes: all });
   return all.length - 1;
 }
 
@@ -94,19 +93,13 @@ export { FIELD };
  *  maintained by hand.
  */
 export function writePublicIndex() {
-  const rows = [];
-  for (const f of ledgerFiles()) {
-    for (const n of loadNotes(path.join(ROOT, f))) {
-      rows.push({
-        commitment: n.commitment,
-        depositTx: n.depositTx ?? null,
-        provedAt: n.provedAt ?? n.receivedAt ?? null,
-        aspRoot: n.aspRoot ?? null,          // a transact carries no association-set proof
-        origin: n.origin ?? "deposit",
-      });
-    }
-  }
-  fs.writeFileSync(path.join(ROOT, "notes.public.json"), JSON.stringify(rows, null, 2) + "
-");
+  const rows = loadAllNotes().map((n) => ({
+    commitment: n.commitment,
+    depositTx: n.depositTx ?? null,
+    provedAt: n.provedAt ?? n.receivedAt ?? null,
+    aspRoot: n.aspRoot ?? null,          // a transact carries no association-set proof
+    origin: n.origin ?? "deposit",
+  }));
+  writeJson(path.join(ROOT, "notes.public.json"), rows);
   return rows.length;
 }

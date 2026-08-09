@@ -30,8 +30,23 @@ export function readDeployment() {
 
 export function writeDeployment(patch) {
   const next = { ...readDeployment(), ...patch };
-  fs.writeFileSync(DEPLOY_FILE, JSON.stringify(next, null, 2) + "\n");
+  writeJson(DEPLOY_FILE, next);
   return next;
+}
+
+/** Write a JSON artefact so that an interrupted write cannot destroy the previous one.
+ *
+ *  Every ledger here was a bare writeFileSync, which truncates the target before it writes:
+ *  kill the process mid-write and the file that held a position's `blinding` is left half a
+ *  document, the next run's JSON.parse throws, and the recovery path IS the failure path.
+ *  Temp-file-then-rename means the reader only ever sees the old file or the new one.
+ *
+ *  ponytail: same-directory rename, which is atomic on NTFS and on POSIX. No fsync — the
+ *  threat here is a killed process, not a power cut. */
+export function writeJson(file, data) {
+  const tmp = `${file}.${process.pid}.tmp`;
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2) + "\n");
+  fs.renameSync(tmp, file);
 }
 
 /** Foundry's cast. Eight files carried this three-line dance, and two of them disagreed
