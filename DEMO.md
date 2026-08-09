@@ -1,192 +1,184 @@
 # Demo script
 
-Target 4–5 minutes. Three beats, in this order. Screen recording plus voice; no slides
-until the last twenty seconds.
+Everything below is live against Monad testnet. No slides, no mockups, no "imagine that".
+Run the commands; the numbers on screen are the numbers in this file.
 
-Open two windows side by side: a terminal in the repo root, and
-https://saksi-gilt.vercel.app. Have `https://testnet.monadexplorer.com` in a third tab.
+Pool `0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA` · CVA `SAKSIAZEV` · chain `10143`
 
 ---
 
-## Cold open — 40 seconds, terminal only, no product yet
-
-Start in the terminal. Do not show the product until the problem is a number.
+## Cold open — 40 seconds, terminal only
 
 ```bash
-node ops/measure-register.mjs
+node ops/measure-register.mjs --report
 ```
 
-While it runs:
+> "Every tokenized-RWA platform publishes its holder register in the clear, and the answer
+> you always get is that a public chain is pseudonymous so it costs nothing. I checked
+> instead. This is every wallet with an active A-Pass, against every A-Token on this chain."
 
-> "Every tokenized asset platform publishes its holder register in the clear, and the
-> usual answer is that a public chain is pseudonymous so it costs nothing. I checked."
+Point at three numbers.
 
-> "A verified asset can only move between wallets that hold a credential, so the
-> credentialed set isn't a sample of possible holders — it's all of them. This reads every
-> balance, for every one of them, against every verified asset on Monad."
+> "Median holders per asset: three. Thirty-five of forty-five assets have fewer than five
+> holders. Sixteen have a single wallet holding over ninety percent. An anonymity set of
+> three is not anonymity — know the asset, watch one transfer, and you have the position
+> and its size."
 
-Let the table land. Point at the median.
-
-> "Median holders per asset: two. Six of the nine have fewer than five. Three have one
-> wallet holding over ninety percent. An anonymity set of two is not anonymity — knowing
-> the asset and watching one transfer identifies the position and its size."
-
-> "And this isn't a quiet testnet. It's the mechanism. The tighter you make an asset's
-> holder rule, the smaller the crowd its holders hide in. Every project in this hackathon
-> tightens that rule. Tightening it makes each remaining holder more exposed, not less."
-
-Now switch to the **Register** tab. Point at the Amount and Holder columns — six dots each.
-
-> "Same asset class, same public chain. Seven positions, five verified holders. The total
-> is public. Who holds what is not."
+> "And it does not fix itself, because it *is* the mechanism. The tighter an asset's holder
+> rule, the smaller the crowd its holders hide in. Compliance and confidentiality pull
+> against each other structurally. The obvious fix — a privacy pool — destroys the thing
+> that made the asset legitimate."
 
 ---
 
 ## Beat 1 — the question comes before the answer · 90 seconds
 
-**This is the strongest beat. Lead with it, not with the technology.**
+```bash
+node ops/audit.mjs list
+```
 
-Go to the **Regulator** tab. Scroll to the aggregate entry marked *request stays open*.
+> "A regulator posts a question on-chain. Then, and only then, the holder produces a proof
+> that answers exactly that question. The contract checks that the proof carries the
+> request's context hash, so an answer to one question cannot be presented as the answer to
+> another."
 
-> "A regulator asked whether total exposure across four positions was at most one
-> thousand. The register did not answer. It could not — the true total was 1,150, and the
-> proof for that claim does not exist. So the request is still open on chain."
+Point at the request and answer block numbers.
 
-Open block 52163014 in the explorer.
+> "Request block always before answer block. You can check that with any RPC endpoint and
+> no access to my repo."
 
-> "That is the question, registered by the auditor, at block 52163014. There is no
-> answering transaction. A register that could have answered that question anyway would be
-> worth nothing."
+Then point at the last row.
 
-Now scroll up to the threshold row and open both transactions.
+> "This is the row I care about. The auditor asked whether total exposure across the
+> register's four live positions is at most one thousand. It is one thousand six hundred and
+> eighty. **No proof exists**, so the request is still open at block 52210907 and it will be
+> open forever. This register cannot answer falsely. It can only fail to answer, and the
+> failure is on the record."
 
-> "Here is one it could answer. Block 52157468 is the auditor asking whether a position is
-> under the cap. Block 52157475 is the answer — a zero-knowledge proof, checked by the
-> contract, that the position is under the cap. It never reveals the position."
+> "That is the whole product in one row. Everything else is machinery for making that row
+> possible."
 
-Pause on the two block numbers.
-
-> "The question is on chain seven blocks before the answer exists. You do not have to
-> trust me about the ordering — the chain records it, and you can check it without my
-> code."
+**If asked how it could cheat:** an earlier version of this contract could be cheated, and
+we found it. The request pinned *who* and *what kind of answer*, but not the **figure** — so
+"is this at most 1,000?" was answerable with "at most 2⁶⁴−1", which is true, provable, and
+closes the request. The contract now pins a hash of the figure and each prover recomputes
+it. There is a failing exploit test in the repo that passes against the fix.
 
 ---
 
-## Beat 2 — why the compliance gate is two gates · 90 seconds
-
-Terminal:
+## Beat 2 — three controls, and they ask different questions · 90 seconds
 
 ```bash
 node ops/gate-gap.mjs
 ```
 
-Let the table print. Point at the burn address row.
+> "Gate one is Cleanverse's own validator. I did not write it. I registered my pool with it,
+> and my deposit function calls it inside the transaction that moves the money."
 
-> "Gate one is Cleanverse's own validator. I did not write it, I registered my pool with
-> it, and my deposit function calls it inside the transaction that moves the money."
+> "Gate two is a zero-knowledge proof of membership in an association set I build from live
+> A-Pass state and anchor on-chain."
 
-> "It says the burn address is compliant. Someone in the shared sandbox issued
-> `0x000…dEaD` a credential, so it satisfies my min-tier-30 rule. Check it yourself —"
+Let the sweep finish — it asks the validator about **every** member, not a sample.
+
+> "Every member of my set is admitted by Cleanverse too. That is the correct result: my set
+> is *derived* from their registry, so it must never be more permissive than it. Earlier
+> today it was — fifteen frozen credentials were sitting in my set holding valid witnesses,
+> and the tool that was supposed to catch that was checking four hardcoded addresses and
+> reporting zero disagreements for a set of five hundred. It sweeps all of them now."
+
+Point at the burn address row.
+
+> "So why two gates, if they agree? Because they diverge in **time**. The anchored root is a
+> snapshot; credentials move continuously. Freeze a credential and the live call refuses
+> immediately, while the anchored root still admits until I rebuild. Neither one subsumes
+> the other."
+
+> "And there is a third control that is neither: the entry proof also shows the depositor is
+> absent from an on-chain sanctions list. The burn address passes Cleanverse and is in my
+> set — and the deny list refuses it anyway."
+
+> **Say this out loud:** "An earlier version of this demo claimed the ZK gate caught the
+> burn address where Cleanverse missed it. That was wrong, and it was my bug — a status
+> filter had dropped seven eighths of the eligible population. With the population
+> enumerated properly both gates admit it. I would rather show you the retraction than the
+> claim."
+
+---
+
+## Beat 3 — the shielded middle, running · 60 seconds
 
 ```bash
-cast call 0xaC7e5179C2C7f03f209136886c172eb34F161792 \
-  "complianceVerify(address,address)(bool)" \
-  0x9BB3af71497304506Be2810915016742394f72f2 \
-  0x000000000000000000000000000000000000dEaD \
+cast call 0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA "noteRoot()(uint256)" \
   --rpc-url https://testnet-rpc.monad.xyz
 ```
 
-> "True. Gate one lets it in. Gate two is a zero-knowledge proof of membership in an
-> association set I build from the live A-Pass registry — and there is no membership
-> witness for the burn address, so no proof exists and it does not enter."
+> "Entry is public and I am not going to pretend otherwise: a deposit has a visible sender
+> and moves a visible amount, so the chain links that commitment to the wallet that opened
+> it. What the commitment buys is the next hop."
 
-Point at the `0x1111…1111` row.
+Show the transfer transaction `0x30a74be85a99b68c4bd0a40a1beb7575b0b06686ed610993ed7f6aa38a8cac68`.
 
-> "And the honest half, in the same table: this one *is* in my set, because it is in
-> Cleanverse's registry. My set is faithful to theirs, not cleaner than theirs. The second
-> gate is not better data — it is a second, independent question, anchored at a moment in
-> time, that an address also has to satisfy."
+> "This is a JoinSplit. Two of the issuer's positions — 250 and 480, both public from their
+> deposits — were spent, and two new positions were created. What is on-chain is two
+> nullifiers and two commitments. The new amounts are **270.1 and 459.9**, and you cannot
+> read either of those anywhere on this chain. Nothing links an input to an output."
 
-Switch to the **Two gates** tab in the console and show the same result rendered live.
-
----
-
-## Beat 3 — revocation, briefly · 60 seconds
-
-> "Fifty other teams here are showing you a freeze, so I will be quick."
-
-Terminal — show the record, not the ceremony:
-
-```bash
-node ops/apass.mjs status 0xa132a1BB7EEA9523Ce08a3D933A20d54AEac6483
-```
-
-Point at `"status": 2`.
-
-> "This holder deposited while verified. Then the issuer withdrew the credential at
-> Cleanverse. No blacklist was written anywhere. The next association set is simply built
-> without them —"
-
-```bash
-node -e "const a=require('./asp.json');console.log(a.dropped)"
-```
-
-> "— and the root rotates. Both gates close independently: Cleanverse's validator now
-> refuses them, and there is no membership witness for them either. Their position freezes
-> without anyone moving it."
+> "The register still backs 1,680 units and still holds six commitments. Four of them are
+> live positions. Which four is not public."
 
 ---
 
-## Close — 40 seconds
-
-Terminal:
+## Beat 4 — revocation, briefly · 45 seconds
 
 ```bash
-node ops/evidence.mjs
+node ops/apass.mjs freeze <holder>
+node ops/asp.mjs build
+```
+
+> "There is no revocation list to maintain. Freeze the A-Pass at Cleanverse and the next
+> association set is simply built without it. The holder can no longer produce an entry
+> proof."
+
+> "Honest boundary: entry is gated cryptographically, the exit is gated operationally. The
+> transfer circuit has no association-set input and the proof is not bound to the sender, so
+> an eligible party could relay a revoked holder's exit. Closing that is a recompile and a
+> new ceremony — about a day. It is in the summary, and there are two tests that assert the
+> gap rather than pretend it is closed."
+
+---
+
+## Close — 30 seconds
+
+```bash
 cd contracts && forge test
 ```
 
-> "Everything I have shown is on Monad testnet and regenerates from the chain — that table
-> is not typed by hand. Thirty-four tests, including a real Groth16 proof verifying against
-> the deployed verifier at 264,000 gas."
-
-> "The asset is mine: I launched it through `atoken/launch` with its compliance rule
-> attached at issuance. The pool holds its own A-Pass, which is what lets a contract
-> custody a verified asset at all. And the compliance check is a constraint inside a
-> circuit over Cleanverse's live identity registry, not a lookup performed beforehand and
-> trusted afterwards."
+> "Sixty-four tests, including the exploit proofs from an adversarial review of this
+> codebase — kept as regression tests, and three of them assert limitations that are still
+> open."
 
 > "Saksi. Every position witnessed. Disclosure only when asked."
-
-## Say this before a judge finds it
-
-Do not let anyone discover this in your devtools. Say it in beat one, in your own words:
-
-> "Entry here is public and I am not going to pretend otherwise — a deposit has a visible
-> sender and moves a visible amount, so the chain already links this commitment to the
-> wallet that opened it. What the commitment buys is the next hop: once a position moves
-> through a JoinSplit, nothing links the new note to this row. That is the layer I'm asking
-> you to judge, and I'll show it running."
-
-Volunteering the boundary is worth more than the boundary being wider. A reviewer who finds
-an overclaim discounts everything else you said; one who hears you name your own limit
-believes the rest.
 
 ---
 
 ## Do not say
 
-- "audit pack" — 54 other entries promise one
+- "audit pack" — many other entries promise one
 - "compliance is not bolted on" / "not decorative" — the field's verbal tic
-- "Travel Rule attribution rides every transfer" — 71 others say it
-- anything about revocation before beat 3
+- "trustless", "revolutionary", "military-grade"
+- anything about revocation before beat 4
 
-## Have ready in case a judge asks
+## Have ready
 
 - **"Is the ZK yours?"** — the seven Circom circuits are prior public work from a Soroban
   build, committed as the first commit under that description. Everything touching
   Cleanverse is this window. Say it before they ask.
-- **"Why is the association set 46 people?"** — the sandbox is shared across teams, so it
-  contains other participants' credentials. That is the registry being faithful.
-- **"What is not finished?"** — the note-tree root is owner-published rather than advanced
-  by the merkleUpdate proof; the deny list is a fixed 8 slots. Both are in the README.
+- **"Why is the association set 524 people?"** — the sandbox is shared across teams, so it
+  holds other participants' credentials. That is the set being faithful to the registry.
+- **"What is not finished?"** — the note root is owner-published rather than advanced by the
+  `merkleUpdate` proof; the exit is gated operationally; the deny list is a fixed 8 slots;
+  the aggregate circuit is 5 slots and the register already exceeds it. All four are in the
+  summary.
+- **"Has anyone done this?"** — Zama × T-REX and Polymesh both shipped confidentiality for
+  regulated assets this year. What I have not seen bundled with it is issuer accountability:
+  a concentration cap, revocation by rebuild, and a recorded non-answer.

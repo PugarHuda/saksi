@@ -63,8 +63,25 @@ const build = (name) => ({
 
 /// Must match SaksiPool's DisclosureKind constants.
 const KIND = { exact: 1, threshold: 2, range: 3, aggregate: 4 };
+const ZERO32 = "0x" + "0".repeat(64);
 
-async function proveAndSend({ circuit, input, selector, sig, question, ctx, kind, answer, subject }) {
+// The claim binds the FIGURE the regulator asked about, and without it the rest of the
+// ceremony is decoration. Pinning the subject and the kind still left "is this position at
+// most 1,000?" answerable with a proof that it is at most 2^64-1 — true, provable, and it
+// closed the request permanently with the record reading ANSWERED. Computed here, on the
+// auditor's side, before any answer exists, exactly as SaksiPool.claimHash recomputes it
+// from the prover's own public signals.
+const claimHash = (kind, a, b) => {
+  if (kind === "exact") return ZERO32;                     // an exact demand names no figure
+  const types = kind === "range" ? "uint8,uint256,uint256" : "uint8,uint256";
+  const vals = kind === "range"
+    ? [String(KIND[kind]), a.toString(), b.toString()]
+    : [String(KIND[kind]), a.toString()];
+  const encoded = cast(["abi-encode", `f(${types})`, ...vals]).trim();
+  return cast(["keccak", encoded]).trim();
+};
+
+async function proveAndSend({ circuit, input, selector, sig, question, ctx, kind, answer, subject, claim }) {
   const { wasm, zkey, vkey } = build(circuit);
 
   // The request names the position and the kind of answer it will accept. Without both,
@@ -73,8 +90,9 @@ async function proveAndSend({ circuit, input, selector, sig, question, ctx, kind
   // with a vacuous threshold statement.
   console.log(`\nregulator registers the question on-chain first`);
   const req = send(
-    [dep.pool, "requestAudit(uint256,uint256,uint8,string)",
-      ctx.toString(), (subject ?? 0n).toString(), String(KIND[kind]), question],
+    [dep.pool, "requestAudit(uint256,uint256,uint8,bytes32,string)",
+      ctx.toString(), (subject ?? 0n).toString(), String(KIND[kind]),
+      claim ?? ZERO32, question],
     auditorPk,
   );
   console.log(
@@ -162,6 +180,7 @@ if (cmd === "threshold") {
     sig: "proveThreshold(uint256[2],uint256[2][2],uint256[2],uint256[3])",
     question: `is this position at most ${toDisplay(capUnits)} ${dep.assetSymbol}?`,
     ctx, kind: "threshold", subject: BigInt(n.commitment),
+    claim: claimHash("threshold", capUnits),
     answer: `yes — position <= ${toDisplay(capUnits)}, figure not disclosed`,
     input: {
       commitment: BigInt(n.commitment).toString(),
@@ -186,6 +205,7 @@ else if (cmd === "range") {
     sig: "proveRange(uint256[2],uint256[2][2],uint256[2],uint256[4])",
     question: `is this position inside the ${toDisplay(lo)}–${toDisplay(hi)} reporting bracket?`,
     ctx, kind: "range", subject: BigInt(n.commitment),
+    claim: claimHash("range", lo, hi),
     answer: `yes — inside the bracket, figure not disclosed`,
     input: {
       commitment: BigInt(n.commitment).toString(),
@@ -209,6 +229,7 @@ else if (cmd === "exact") {
     sig: "proveExact(uint256[2],uint256[2][2],uint256[2],uint256[3])",
     question: `disclose this position in full`,
     ctx, kind: "exact", subject: BigInt(n.commitment),
+    claim: claimHash("exact"),
     answer: `${toDisplay(BigInt(n.amount))} ${dep.assetSymbol}`,
     input: {
       commitment: BigInt(n.commitment).toString(),
@@ -242,11 +263,41 @@ else if (cmd === "aggregate") {
     .filter(Boolean);
 
   const known = new Map(notes.map((n) => [BigInt(n.commitment).toString(), n]));
-  const required = onChain.map((c) => ({ commitment: c, note: known.get(BigInt(c).toString()) }));
+  let required = onChain.map((c) => ({ commitment: c, note: known.get(BigInt(c).toString()) }));
+
+  // A SPENT commitment is not a position, and the register having spent some is public:
+  // every `transact` publishes its input nullifiers in the Transacted event, so anyone
+  // counting can see that two positions were retired. WHICH two is what stays hidden, and
+  // that is the confidentiality this register is for.
+  //
+  // So the auditor's set is the commitments the contract holds MINUS the retired ones, and
+  // the count of retirements is checked against the chain rather than taken on trust — if
+  // the register claimed a retirement the event log does not show, this refuses to proceed.
+  // Read the receipts of the transfers the register recorded, rather than scanning logs:
+  // Monad caps eth_getLogs at a 100-block range, so a from-block-0 sweep is not available.
+  // Each receipt is fetched by hash and its Transacted topic counted, which is bounded and
+  // exact — and still a chain read, not the ledger vouching for itself.
+  const TRANSACTED = cast(["sig-event", "Transacted(bytes32,bytes32,uint256,address)"]).trim();
+  const transferTxs = [...new Set(notes.filter((n) => n.origin === "transact")
+    .map((n) => n.depositTx).filter(Boolean))];
+  const retiredOnChain = transferTxs.reduce((sum, tx) => {
+    const receipt = cast(["receipt", tx, "--rpc-url", RPC]);
+    return sum + (receipt.includes(TRANSACTED) ? 2 : 0);   // two inputs nullified per transfer
+  }, 0);
+  const retiredClaimed = required.length - required.filter((r) => r.note).length;
+  if (retiredClaimed !== retiredOnChain) {
+    console.log(`the register accounts for ${retiredClaimed} retired commitment(s) but the chain shows ${retiredOnChain}.`);
+    console.log("Refusing to enumerate a set the event log does not corroborate.");
+    process.exit(1);
+  }
+  if (retiredOnChain) {
+    console.log(`${retiredOnChain} commitment(s) were retired by a shielded transfer and are not positions.`);
+    required = required.filter((r) => r.note);
+  }
 
   if (required.length > AGG_SLOTS) {
     console.log(
-      `the register holds ${required.length} positions; this circuit is fixed at ${AGG_SLOTS} slots.\n` +
+      `the register holds ${required.length} live positions; this circuit is fixed at ${AGG_SLOTS} slots.\n` +
       `A wider set needs a wider circuit — answering over a subset would be exactly the\n` +
       `cherry-picking this design exists to prevent, so it is refused rather than trimmed.`,
     );
@@ -288,6 +339,7 @@ else if (cmd === "aggregate") {
     sig: "proveAggregate(uint256[2],uint256[2][2],uint256[2],uint256[13])",
     question: `is total exposure across all ${used.length} registered positions at most ${toDisplay(capUnits)} ${dep.assetSymbol}?`,
     ctx, kind: "aggregate", subject: 0n,   // the set is named by the context hash
+    claim: claimHash("aggregate", capUnits),
     answer: `yes — sum of ${used.length} positions <= ${toDisplay(capUnits)}, no individual position disclosed`,
     input: {
       commitments: commitments.map(String),

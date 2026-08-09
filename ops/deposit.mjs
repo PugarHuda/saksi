@@ -26,8 +26,24 @@ import { ROOT, RPC, readDeployment } from "./env.mjs";
 
 const dep = readDeployment();
 const asp = JSON.parse(fs.readFileSync(path.join(ROOT, "asp.json"), "utf8"));
-const who = process.env.DEPLOYER_ADDRESS;
-const pk = process.env.DEPLOYER_PK;
+// Which holder is entering. The register's whole point is that several PEOPLE hold
+// positions in it, not that one wallet holds several notes, so the depositor has to be
+// selectable:  node ops/deposit.mjs 640 --as fund
+const asLabel = (() => {
+  const i = process.argv.indexOf("--as");
+  return i > 0 ? process.argv[i + 1] : null;
+})();
+const holder = (() => {
+  if (!asLabel) return { address: process.env.DEPLOYER_ADDRESS, priv: process.env.DEPLOYER_PK };
+  const ws = JSON.parse(fs.readFileSync(path.join(ROOT, "wallets.json"), "utf8"));
+  // Last match wins: seed-holders appends, so the freshest wallet for a label is the live
+  // one — an older entry for the same label has already spent its balance.
+  const w = [...ws].reverse().find((x) => x.label === asLabel && x.priv);
+  if (!w) throw new Error(`no wallet labelled ${asLabel} carrying a key in wallets.json`);
+  return w;
+})();
+const who = holder.address;
+const pk = holder.priv;
 const dry = process.argv.includes("--dry");
 const amountUnits = Number(process.argv[2] ?? 250);
 const amount = BigInt(Math.round(amountUnits * 1e6));      // 6 decimals
@@ -161,6 +177,11 @@ const out = cast(["send", dep.pool,
   amount.toString(), commitmentHex,
   fmt(pA), fmt2(pB), fmt(pC), fmt(pub),
   fmt(bA), fmt2(bB), fmt(bC), fmt(bind),
+  // Monad's estimator replays this against a state where the approve above has not
+  // settled, and reports the failure as InvalidProof rather than as a missing allowance.
+  // The same calldata simulates clean with eth_call, so the estimate is what is wrong.
+  // Fixed limit, generously above the ~2.91M two Groth16 verifications actually cost.
+  "--gas-limit", "3600000",
   "--rpc-url", RPC, "--chain", "10143", "--private-key", pk]);
 const lines = out.split("\n").filter((l) => /^(status|transactionHash|gasUsed|blockNumber)/.test(l));
 console.log(lines.join("\n"));

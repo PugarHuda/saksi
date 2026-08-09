@@ -1,7 +1,7 @@
-# Submission email — draft
+# Submission email — Cleanverse Build: Trusted Assets
 
 **To:** isaac@cleanverse.com
-**Subject:** Saksi — RWA track submission (confidential holder register, Monad testnet)
+**Subject:** Saksi — RWA track submission (Pugar Huda Mantoro)
 
 ---
 
@@ -9,88 +9,98 @@ Hi Isaac,
 
 Submitting **Saksi** for the RWA track.
 
-**Repo** https://github.com/PugarHuda/saksi
-**Live demo** https://saksi-gilt.vercel.app
-**Demo video** _[paste link]_
-**One-page summary** https://github.com/PugarHuda/saksi/blob/main/SUMMARY.md — also attached
+- **Repo:** https://github.com/PugarHuda/saksi
+- **Live demo:** https://saksi-gilt.vercel.app
+- **One-page summary:** [SUMMARY.md](https://github.com/PugarHuda/saksi/blob/main/SUMMARY.md) (also attached)
+- **Demo video:** _[paste link]_
+- **Deployed chain:** Monad testnet, chain `10143`
 
-**Deployed chain:** Monad testnet (10143)
+---
 
-Saksi is a confidential holder register for tokenized RWAs. Positions in a Cleanverse
-Verified Asset are held as commitments, so amount and holder are absent from the chain,
-while entry, exit and audit stay answerable.
+## What it is
 
-Three things I would point a judge at first:
+A confidential holder register for tokenized real-world assets. Positions are held as
+commitments; they move by JoinSplit so amounts and owners are not published; entry is gated
+twice; and the register answers a regulator with zero-knowledge proofs rather than
+spreadsheets.
 
-0. **The problem is measured, not asserted.** `node ops/measure-register.mjs` runs an
-   exhaustive census — a CVA transfer needs a credential on both sides, so the 545
-   credentialed wallets on Monad are the complete set of possible holders, not a sample.
-   Result: **median holders per verified asset is 2**, six of nine assets have fewer than
-   five holders, and three have a single wallet holding over 90% of supply. That is the
-   mechanism rather than a testnet artefact — the tighter an asset's holder rule, the
-   smaller the crowd its holders hide in. Compliance and confidentiality pull against each
-   other structurally, and Saksi is the entry that refuses the trade-off instead of
-   picking a side.
+## The problem, measured rather than asserted
 
+We ran an exhaustive census — every wallet holding an active A-Pass, against every A-Token
+on Monad — instead of assuming pseudonymity is protection.
 
-1. **The auditor's question is registered on-chain before the answer exists.** Block
-   52157468 asks whether a position is under a cap; block 52157475 answers with a Groth16
-   proof that it is, without revealing the position. The ordering is checkable by anyone
-   with an RPC endpoint. And one request has no answer at all — asked whether total
-   exposure across four positions was at most 1,000 when it was 1,150, no proof could be
-   produced, so request 52163014 is still open. The register cannot answer falsely; it can
-   only fail to answer.
+Median holders per asset: **3**. Thirty-five of forty-five assets have fewer than five
+holders. Sixteen are over 90% held by a single wallet.
 
-2. **Cleanverse's validator says the burn address is compliant.**
-   `complianceVerify(0x9BB3af71…, 0x…dEaD)` returns true on Monad testnet right now —
-   someone in the shared sandbox issued `0x…dEaD` a credential. Gate one admits it; the ZK
-   membership gate has no witness for it, so it does not enter. That is a live argument for
-   why the compliance gate is two gates, reproducible with `node ops/gate-gap.mjs`. I have
-   also written up the honest half: `0x1111…1111` *is* in our set because it is in the
-   registry — the set is faithful to Cleanverse, not cleaner than it.
+An anonymity set of three is not anonymity, and it does not fix itself, because it is the
+mechanism: the tighter an asset's holder rule, the smaller the crowd its holders hide in.
+Compliance and confidentiality pull against each other structurally. The obvious fix — a
+privacy pool — destroys the accountability that made the asset legitimate.
 
-**Key addresses**
+## CVI · CVA integration
+
+1. **Gate one is your contract, not our reimplementation of one.** The pool is registered
+   with the CVI Compliance Validator at `0xaC7e5179C2C7f03f209136886c172eb34F161792`, and
+   `deposit()` calls `complianceVerify(pool, msg.sender)` on it live, inside the transaction
+   that moves value. An unregistered pool reverts rather than returning false.
+2. **The asset is a real CVA.** `SAKSIAZEV` issued through `atoken/launch` with a `min_tier
+   30` rule from issuance. `activeRules()` on our pool and `getRulesV2()` on yours return the
+   identical tuple.
+3. **The association set is derived from live CVI** — 524 members from a population of 602,
+   rebuilt from A-Pass state each run, root anchored on-chain.
+4. **Revocation is a rebuild, not a blacklist.** Freeze an A-Pass and the next set is built
+   without it; the holder can no longer produce an entry proof.
+5. **A third control:** the entry proof also shows non-membership of an on-chain sanctions
+   list, which carries a live entry.
+
+## What is deployed and exercised
 
 | | |
 |---|---|
-| SaksiPool | `0x9BB3af71497304506Be2810915016742394f72f2` |
-| Saksi Series A Note — our own CVA, launched via `atoken/launch` | `0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B` |
-| Registered with your CVI Validator | `0xaC7e5179C2C7f03f209136886c172eb34F161792` · `isRegistered(pool)` → true · `getRulesV2(pool)` → `(0x0000,0x0000,30,0,0)` |
+| SaksiPool | `0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA` |
+| Saksi Series A Note (our CVA) | `0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B` |
+| Register | 6 commitments · 4 live positions · 1,680 CVA |
+| Tests | 64 passing, including an adversarial review's own exploit POCs |
 
-`node ops/evidence.mjs` regenerates the full evidence table straight from the chain.
+The shielded transfer runs on-chain: one JoinSplit spent two positions of 250 and 480 and
+created two whose amounts appear nowhere on the chain (block 52209800).
 
-**Declared prior work:** the seven Circom circuits and their proving keys are prior public
-work from an earlier Soroban build, and are committed as the first commit under exactly
-that description. Everything that touches Cleanverse — the Solidity pool and its two gates,
-the association-set builder, the four disclosure flows, the deployment and the consoles —
-was built during the window.
+## The one thing worth clicking
 
-**Two sandbox issues worth passing to the team**, both worked around rather than blocking:
+Every audit answer is bound to a request the auditor — **a different key from the issuer** —
+posted on-chain before the answer existed, and every request block precedes its answer block.
 
-- `POST /update_status` returns `[500] System Error` while the on-chain freeze nonetheless
-  succeeds — the credential does go to `status: 2` and `complianceVerify` flips to false,
-  so only the response path appears broken.
-- `POST /download_travel_rule` only accepts a **plain JSON** body; sent encrypted like the
-  other write endpoints it reports `The tx hash cannot be empty, The wallet cannot be null`.
-  It is not listed among the plain endpoints in the docs.
+The strongest row is a failure. The auditor asked whether total exposure across the four live
+positions is at most 1,000 when it is in fact 1,680. **No proof exists**, so request block
+`52210907` is open and stays open. The register cannot answer falsely; it can only fail to
+answer, and the failure is permanent and public.
 
-Also, for completeness: the validator exposes `apass()` →
-`0xbA82D189540CaC9DC6FF46B6837CaC1BFdEC58B9` on Monad, which is not documented anywhere I
-could find and was useful.
+## Two disclosures you should have from us
 
-Thanks for running this — the API access and the integration guides made a genuinely deep
-integration possible in the window.
+**The repository was deleted and recreated during the window.** Testnet note secrets for a
+superseded pool reached the public repo and survived two history rewrites, because GitHub
+serves orphaned commits by SHA and the SHAs are discoverable from the public Events API.
+Destroying and recreating the repository was the only way to purge the object store, so the
+final push is one push — the commit history and its timestamps are preserved and all sit
+inside the hacking window. There was zero key reuse into the live pool.
+
+**Limitations we would rather state than have found.** Entry is public by construction; the
+exit is gated operationally rather than cryptographically; the note root is owner-published
+because `merkleUpdate` is not wired to it; the trusted setup is a single trust domain; both
+gates ultimately root in one authority. All five are in the summary, and two Foundry tests
+assert the open limitations instead of pretending they are closed.
+
+Thanks for running this — the sandbox and the Telegram support both held up well under a
+lot of concurrent load.
 
 Best,
 Pugar Huda Mantoro
-hudapugar@gmail.com · github.com/PugarHuda
 
 ---
 
 ## Checklist before sending
 
-- [ ] Demo video uploaded and the link is public (test in a private window)
-- [ ] `SUMMARY.md` attached as a PDF or pasted inline — judges read this, not the repo
-- [ ] Repo is public (test in a private window)
-- [ ] Console loads and the Two gates tab renders live
-- [ ] Send before **9 Aug 23:59 UTC**
+- [ ] Demo video recorded and linked (script in `DEMO.md`)
+- [ ] `SUMMARY.md` attached as well as linked
+- [ ] Repo public and cloning anonymously
+- [ ] Live URL loading
