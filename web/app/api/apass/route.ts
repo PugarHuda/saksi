@@ -4,8 +4,13 @@ import { NextResponse } from "next/server";
 // plain JSON — the api-key is only ever used locally for AES on write endpoints, and
 // this route has no write path at all.
 
-const BASE = process.env.CV_BASE ?? "https://uatapi.cleanverse.com/api/cooperate";
-const CHAIN = process.env.CHAIN ?? "monad";
+// Env values can arrive with a UTF-8 BOM or trailing newline depending on how they were
+// piped in. A BOM in a header value throws before the request is even made, so clean
+// every value that ends up on the wire.
+const clean = (v: string | undefined) => v?.replace(/^﻿/, "").trim();
+
+const BASE = clean(process.env.CV_BASE) || "https://uatapi.cleanverse.com/api/cooperate";
+const CHAIN = clean(process.env.CHAIN) || "monad";
 
 export const dynamic = "force-dynamic";
 
@@ -14,7 +19,7 @@ export async function GET(req: Request) {
   if (!address || !/^0x[0-9a-fA-F]{40}$/.test(address)) {
     return NextResponse.json({ error: "pass a 20-byte hex address" }, { status: 400 });
   }
-  const apiId = process.env.CV_API_ID;
+  const apiId = clean(process.env.CV_API_ID);
   if (!apiId) {
     return NextResponse.json({ error: "CV_API_ID is not configured" }, { status: 503 });
   }
