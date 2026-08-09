@@ -108,7 +108,7 @@ export default function IssuerView({
               aria-describedby={showError ? "wallet-error" : undefined}
             />
             {showError && (
-              <span id="wallet-error" style={{ color: "var(--refused)", fontSize: 12.5 }}>
+              <span id="wallet-error" style={{ color: "var(--refused)", fontSize: "var(--t-xs)" }}>
                 Needs a 20-byte hex address, like 0x4490…4639.
               </span>
             )}
@@ -178,7 +178,7 @@ export default function IssuerView({
                       .slice(0, 10)}
                   </dd>
                   <dt>KYC hash</dt>
-                  <dd className="mono" style={{ fontSize: 12 }}>
+                  <dd className="mono" style={{ fontSize: "var(--t-xs)" }}>
                     {short(result.apass.currentKycHash, 12, 8)}
                   </dd>
                 </dl>
@@ -269,7 +269,7 @@ export default function IssuerView({
                       </td>
                       <td className="mono">{m.tier}</td>
                       <td className="mono">{m.countries.join(", ") || "—"}</td>
-                      <td className="mono" style={{ fontSize: 12 }}>
+                      <td className="mono" style={{ fontSize: "var(--t-xs)" }}>
                         {m.currentKycHash ? short(m.currentKycHash, 10, 6) : "—"}
                       </td>
                     </tr>

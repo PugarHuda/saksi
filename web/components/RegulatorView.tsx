@@ -65,7 +65,7 @@ export default function RegulatorView({
           <h2>Positions disclosed</h2>
           <p className="stat mono">
             {audit.filter((a) => a.kind === "exact").length}
-            <span style={{ fontSize: 15, color: "var(--muted)" }}> / {positions.length}</span>
+            <span style={{ fontSize: "var(--t-lg)", color: "var(--muted)" }}> / {positions.length}</span>
           </p>
           <p className="note" style={{ margin: "8px 0 0" }}>
             Only the exact disclosures reveal a figure. The rest answered without one.
@@ -109,7 +109,7 @@ export default function RegulatorView({
                       <Badge tone={a.verified ? "ok" : "warn"}>
                         {a.verified ? "Verified on chain" : "Open — no proof exists"}
                       </Badge>
-                      <strong style={{ fontSize: 14 }}>{copy.title} disclosure</strong>
+                      <strong style={{ fontSize: "var(--t-md)" }}>{copy.title} disclosure</strong>
                       <span className="note" style={{ display: "inline", marginLeft: "auto" }}>
                         proved in {a.proveMs} ms
                       </span>
@@ -132,7 +132,7 @@ export default function RegulatorView({
                       <dt>Circuit</dt>
                       <dd className="mono">{a.circuit}</dd>
                       <dt>Context</dt>
-                      <dd className="mono" style={{ fontSize: 12 }}>
+                      <dd className="mono" style={{ fontSize: "var(--t-xs)" }}>
                         {short(a.contextHash, 14, 10)}
                       </dd>
                       <dt>Request</dt>

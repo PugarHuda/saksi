@@ -61,8 +61,10 @@ export default function Landing() {
             <span className="dots" aria-hidden="true">
               <i /><i /><i />
             </span>
+            {/* One noun phrase, cut by its own italic. "Keeps" carries both senses — the
+                register maintains its positions and it keeps them to itself. */}
             <h1 className="display">
-              THE REGISTER
+              THE HOLDER REGISTER
               <br />
               <em>that keeps</em>
               <br />

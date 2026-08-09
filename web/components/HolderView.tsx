@@ -150,7 +150,7 @@ export default function HolderView({
             <button
               type="button"
               className="btn ghost"
-              style={{ padding: "2px 8px", fontSize: 12 }}
+              style={{ padding: "2px 8px", fontSize: "var(--t-xs)" }}
               onClick={() => {
                 setInput(deployment.issuer!);
                 run(deployment.issuer!);

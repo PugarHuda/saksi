@@ -77,7 +77,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-size: 14px;
+  font-size: var(--t-md);
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
 }
@@ -93,7 +93,7 @@ a { color: inherit; }
 :focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
-  border-radius: 3px;
+  border-radius: var(--r-sm);
 }
 
 /* ---- shell ------------------------------------------------------------- */
@@ -110,12 +110,12 @@ a { color: inherit; }
 }
 
 .wordmark { display: flex; align-items: center; gap: 10px; }
-.wordmark h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; font-weight: 620; }
-.wordmark .tag { color: var(--muted); font-size: 13px; }
+.wordmark h1 { font-size: var(--t-xl); margin: 0; letter-spacing: -0.01em; font-weight: 600; }
+.wordmark .tag { color: var(--muted); font-size: var(--t-sm); }
 
 .builton {
   display: flex; align-items: center; gap: 8px;
-  margin-left: auto; color: var(--muted); font-size: 12px;
+  margin-left: auto; color: var(--muted); font-size: var(--t-xs);
 }
 .builton .rule { width: 1px; height: 22px; background: var(--border); }
 
@@ -131,7 +131,7 @@ a { color: inherit; }
   color: var(--muted);
   cursor: pointer;
   font: inherit;
-  font-weight: 520;
+  font-weight: 500;
   min-height: 40px;
   padding: 8px 14px;
   transition: color 120ms ease, background-color 120ms ease;
@@ -157,23 +157,23 @@ a { color: inherit; }
 }
 .card > h2, .card > h3 {
   margin: 0 0 4px;
-  font-size: 13px;
+  font-size: var(--t-sm);
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--muted);
 }
-.card .note { color: var(--muted); font-size: 13px; margin: 0 0 12px; }
+.card .note { color: var(--muted); font-size: var(--t-sm); margin: 0 0 12px; }
 
-.stat { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; margin: 6px 0 0; }
+.stat { font-size: var(--t-2xl); font-weight: 600; letter-spacing: -0.02em; margin: 6px 0 0; }
 .stat.accent { color: var(--accent); }
 .stat.shielded { color: var(--shielded); }
 
 .kv { display: grid; grid-template-columns: minmax(120px, auto) 1fr; gap: 6px 14px; margin: 0; }
-.kv dt { color: var(--muted); font-size: 12px; letter-spacing: 0.03em; text-transform: uppercase; }
+.kv dt { color: var(--muted); font-size: var(--t-xs); letter-spacing: 0.03em; text-transform: uppercase; }
 .kv dd { margin: 0; word-break: break-all; }
 
-.hash { color: var(--muted); font-size: 12.5px; }
+.hash { color: var(--muted); font-size: var(--t-xs); }
 .hash a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; }
 .hash a:hover { border-bottom-color: var(--accent); }
 
@@ -181,8 +181,8 @@ a { color: inherit; }
 
 .badge {
   display: inline-flex; align-items: center; gap: 6px;
-  border-radius: 999px; padding: 2px 9px;
-  font-size: 12px; font-weight: 560; letter-spacing: 0.01em;
+  border-radius: var(--r-pill); padding: 2px 9px;
+  font-size: var(--t-xs); font-weight: 500; letter-spacing: 0.01em;
   border: 1px solid transparent; white-space: nowrap;
 }
 .badge.ok { color: var(--verified); background: var(--verified-soft); border-color: var(--verified-soft); }
@@ -195,9 +195,9 @@ a { color: inherit; }
 
 .scroll { overflow-x: auto; }
 
-table { border-collapse: collapse; width: 100%; font-size: 13px; }
+table { border-collapse: collapse; width: 100%; font-size: var(--t-sm); }
 th {
-  text-align: left; font-size: 11.5px; letter-spacing: 0.06em;
+  text-align: left; font-size: var(--t-xs); letter-spacing: 0.06em;
   text-transform: uppercase; color: var(--muted); font-weight: 600;
   padding: 8px 10px; border-bottom: 1px solid var(--border); white-space: nowrap;
 }
@@ -214,7 +214,7 @@ tbody tr:hover td { background: var(--surface-2); }
 /* ---- form -------------------------------------------------------------- */
 
 .field { display: flex; flex-direction: column; gap: 6px; }
-.field label { font-size: 12px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.field label { font-size: var(--t-xs); letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
 
 input[type="text"] {
   background: var(--surface-2);
@@ -253,7 +253,7 @@ input[type="text"]::placeholder { color: var(--muted); }
 .skeleton {
   background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
   background-size: 200% 100%;
-  border-radius: 4px;
+  border-radius: var(--r-sm);
   display: block;
   height: 1em;
 }
@@ -280,7 +280,7 @@ input[type="text"]::placeholder { color: var(--muted); }
   border-radius: 0 var(--r) var(--r) 0;
   padding: 10px 14px;
   color: var(--foreground);
-  font-size: 13px;
+  font-size: var(--t-sm);
 }
 
 .sr-only {
@@ -291,7 +291,7 @@ input[type="text"]::placeholder { color: var(--muted); }
 footer.foot {
   border-top: 1px solid var(--border);
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: var(--t-xs);
   margin-top: 34px;
   padding-top: 16px;
 }
@@ -321,11 +321,11 @@ footer.foot {
   gap: 10px;
   text-decoration: none;
 }
-.land-nav .wordmark strong { font-size: 17px; letter-spacing: -0.01em; }
+.land-nav .wordmark strong { font-size: var(--t-xl); letter-spacing: -0.01em; }
 .land-nav nav { align-items: center; display: flex; gap: 8px; }
 .land-nav nav > a:not(.btn) {
   color: var(--muted);
-  font-size: 13px;
+  font-size: var(--t-sm);
   padding: 10px 8px;             /* keeps the 40px touch target the text alone would miss */
   text-decoration: none;
 }
@@ -334,7 +334,7 @@ footer.foot {
 .hero { padding: 26px 0 8px; }
 .eyebrow {
   color: var(--muted);
-  font-size: 12px;
+  font-size: var(--t-xs);
   font-weight: 500;
   letter-spacing: 0.08em;
   margin: 0 0 14px;
@@ -350,7 +350,7 @@ footer.foot {
 }
 .lede {
   color: var(--muted);
-  font-size: 15.5px;
+  font-size: var(--t-lg);
   line-height: 1.65;
   margin: 0 0 14px;
   max-width: 64ch;
@@ -371,22 +371,23 @@ footer.foot {
   padding-top: 30px;
 }
 .band h2 {
-  font-size: 21px;
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  margin: 0 0 14px;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: var(--t-2xl);
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  margin: 0 0 16px;
 }
-.band h3 { font-size: 15px; font-weight: 600; margin: 0 0 8px; }
+.band h3 { font-size: var(--t-lg); font-weight: 600; margin: 0 0 8px; }
 
 .reads {
   border-left: 2px solid var(--accent);
-  font-size: 15.5px;
+  font-size: var(--t-lg);
   line-height: 1.6;
   margin: 20px 0 0;
   max-width: 64ch;
   padding-left: 14px;
 }
-.note { color: var(--muted); font-size: 12.5px; margin: 14px 0 0; max-width: 72ch; }
+.note { color: var(--muted); font-size: var(--t-xs); margin: 14px 0 0; max-width: 72ch; }
 
 .stats {
   display: grid;
@@ -405,8 +406,8 @@ footer.foot {
   gap: 6px;
   padding: 16px;
 }
-.stat-big .n { font-size: 30px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
-.stat-big .l { color: var(--muted); font-size: 12.5px; line-height: 1.4; }
+.stat-big .n { font-size: var(--t-2xl); font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
+.stat-big .l { color: var(--muted); font-size: var(--t-xs); line-height: 1.4; }
 
 .actors, .pair {
   display: grid;
@@ -417,17 +418,17 @@ footer.foot {
 .actor dl { display: grid; gap: 3px; margin: 0; }
 .actor dt {
   color: var(--muted);
-  font-size: 11.5px;
+  font-size: var(--t-xs);
   font-weight: 500;
   letter-spacing: 0.06em;
   margin-top: 10px;
   text-transform: uppercase;
 }
-.actor dd { font-size: 13.5px; line-height: 1.5; margin: 0; }
+.actor dd { font-size: var(--t-sm); line-height: 1.5; margin: 0; }
 .actor dd.hid { color: var(--shielded); }
 
-.pair .card p { color: var(--muted); font-size: 13.5px; line-height: 1.6; margin: 0; }
-.pair .card code { font-size: 12.5px; }
+.pair .card p { color: var(--muted); font-size: var(--t-sm); line-height: 1.6; margin: 0; }
+.pair .card code { font-size: var(--t-xs); }
 
 .refusal {
   background: var(--surface);
@@ -437,8 +438,8 @@ footer.foot {
   margin: 20px 0 0;
   padding: 16px 18px;
 }
-.refusal .q { font-size: 15.5px; margin: 0 0 10px; }
-.refusal .a { color: var(--refused); font-size: 13px; margin: 0; }
+.refusal .q { font-size: var(--t-lg); margin: 0 0 10px; }
+.refusal .a { color: var(--refused); font-size: var(--t-sm); margin: 0; }
 
 .deployed { display: grid; gap: 0; margin: 20px 0 0; }
 .deployed .row {
@@ -449,8 +450,8 @@ footer.foot {
   gap: 4px 16px;
   padding: 11px 0;
 }
-.deployed dt { color: var(--muted); flex: 0 0 210px; font-size: 13px; }
-.deployed dd { font-size: 12.5px; margin: 0; overflow-wrap: anywhere; }
+.deployed dt { color: var(--muted); flex: 0 0 210px; font-size: var(--t-sm); }
+.deployed dd { font-size: var(--t-xs); margin: 0; overflow-wrap: anywhere; }
 
 @media (max-width: 560px) {
   .deployed dt { flex-basis: 100%; }
@@ -463,7 +464,7 @@ footer.foot {
   border: 1px solid var(--border);
   border-radius: var(--r);
   color: var(--foreground);
-  font-size: 13.5px;
+  font-size: var(--t-sm);
   min-height: 40px;                 /* the touch target the text alone would miss */
   padding: 9px 12px;
   width: 100%;
@@ -507,8 +508,14 @@ footer.foot {
   padding-bottom: 14px;
 }
 .split-head .wordmark { align-items: center; color: inherit; display: flex; gap: 9px; text-decoration: none; }
-.split-head .wordmark strong { font-size: 16px; letter-spacing: -0.01em; }
-.split-chain { color: var(--muted); font-size: 11.5px; letter-spacing: 0.05em; }
+.split-head .wordmark strong {
+  font-family: var(--font-display), Georgia, serif;
+  font-size: var(--t-xl);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+}
+.split-head .wordmark strong::after { content: "."; color: var(--accent); }
+.split-chain { color: var(--muted); font-size: var(--t-xs); letter-spacing: 0.05em; }
 
 .split-body {
   display: flex;
@@ -525,38 +532,47 @@ footer.foot {
 
 /* The display face carries the whole page's tone: wide tracking on the caps, an
    italic middle line that breaks the rhythm the way the reference does. */
+/* Caps in the display serif, tracked wide enough that the counters breathe — at this size
+   a serif set solid reads as a wall. The italic line is the same family, untracked and
+   larger, so the eye lands on it: one voice, two registers. */
 .display {
-  font-size: clamp(27px, 4.1vw, 46px);
-  font-weight: 500;
-  letter-spacing: 0.05em;
-  line-height: 1.12;
-  margin: 0 0 20px;
+  font-family: var(--font-display), "Iowan Old Style", Georgia, serif;
+  font-size: clamp(30px, 4.6vw, 54px);
+  font-weight: 400;
+  letter-spacing: 0.085em;
+  line-height: 1.08;
+  margin: 0 0 22px;
+  text-indent: 0.085em;              /* optical: tracking pads the right, not the left */
   text-transform: uppercase;
 }
 .display em {
-  font-family: var(--font-sans), Georgia, serif;
+  display: inline-block;
+  font-size: 1.12em;
   font-style: italic;
-  font-weight: 400;
-  letter-spacing: -0.01em;
+  letter-spacing: 0;
+  padding: 0.06em 0 0.02em;
+  text-indent: 0;
   text-transform: none;
 }
 .display-sub {
   color: var(--muted);
-  font-size: 14px;
-  line-height: 1.6;
-  margin: 0 auto 26px;
-  max-width: 40ch;
+  font-size: var(--t-sm);
+  line-height: 1.65;
+  margin: 0 auto 28px;
+  max-width: 36ch;
 }
 
 /* A slab button, not a pill — the reference's square CTA reads as institutional. */
 .btn.slab {
   background: var(--foreground);
   border: 1px solid var(--foreground);
-  border-radius: 2px;
+  border-radius: 0;
   color: var(--background);
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  padding: 13px 26px;
+  font-size: var(--t-2xs);
+  font-weight: 500;
+  letter-spacing: 0.19em;
+  padding: 15px 30px;
+  text-indent: 0.19em;
 }
 .btn.slab:hover { opacity: 0.88; }
 
@@ -564,20 +580,22 @@ footer.foot {
 .strip-label {
   color: var(--muted);
   display: block;
-  font-size: 10.5px;
-  letter-spacing: 0.16em;
-  margin-bottom: 10px;
+  font-size: var(--t-2xs);
+  letter-spacing: 0.22em;
+  margin-bottom: 12px;
+  text-indent: 0.22em;
 }
 .strip {
-  color: var(--muted);
+  color: var(--foreground);
   display: flex;
   flex-wrap: wrap;
-  font-size: 12.5px;
-  gap: 8px 22px;
+  font-family: var(--font-display), Georgia, serif;
+  font-size: var(--t-lg);
+  gap: 6px 26px;
   justify-content: center;
-  letter-spacing: 0.04em;
   list-style: none;
   margin: 0;
+  opacity: 0.55;
   padding: 0;
 }
 
@@ -607,7 +625,7 @@ footer.foot {
 }
 .visual-nav a {
   color: var(--muted);
-  font-size: 12.5px;
+  font-size: var(--t-xs);
   padding: 10px 12px;                 /* keeps a 40px target the text alone would miss */
   text-decoration: none;
 }
@@ -647,12 +665,13 @@ footer.foot {
   z-index: 2;
 }
 .visual-card h2 {
-  font-size: 12px;
+  font-size: var(--t-2xs);
   font-weight: 600;
-  letter-spacing: 0.14em;
-  margin: 0 0 8px;
+  letter-spacing: 0.19em;
+  margin: 0 0 10px;
+  text-indent: 0.19em;
 }
-.visual-card p { color: var(--muted); font-size: 12.5px; line-height: 1.55; margin: 0; }
+.visual-card p { color: var(--muted); font-size: var(--t-xs); line-height: 1.55; margin: 0; }
 .visual-card .card-q {
   border-top: 1px solid var(--border);
   color: var(--accent);

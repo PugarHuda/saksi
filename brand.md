@@ -42,11 +42,20 @@ one view for two different meanings.
 
 ## Typography
 
+- Display — headlines, section headings, the wordmark: **Instrument Serif**, a transitional
+  serif set in wide-tracked caps and cut once by its own italic. It is not decoration. A page
+  that sets every level in one geometric sans has headings that are body copy at a larger
+  size, which is the tell of an interface nobody chose the type for.
 - UI: **Geist Sans** via `next/font`.
 - Numbers, hashes, roots, addresses: **Geist Mono**, always. A field element rendered in
   a proportional face is unreadable and, worse, unverifiable by eye.
-- Scale: 12 / 13 / 14 / 16 / 20 / 28. Labels 12–13 uppercase tracking-wide in `--muted`;
-  values 14–16 mono in `--foreground`.
+- Scale: 12 / 13 / 14 / 16 / 20 / 28, plus one 11 for tracked caps — at 0.19em tracking a
+  label needs to sit below the 12 floor or it reads as a headline. Declared as `--t-2xs`
+  through `--t-2xl` in `globals.css`; **every** font-size in the app resolves to one of them.
+  If a component wants a size that is not on the scale, the scale is wrong, not the component.
+- Weights: 400, 500, 600. Nothing between. A variable face will happily render 520 and 620,
+  which is exactly how six weights survived in this stylesheet unnoticed.
+- Labels 12–13 uppercase tracking-wide in `--muted`; values 14–16 mono in `--foreground`.
 
 ## Voice
 

@@ -86,11 +86,11 @@ export default function RegisterView({
         </p>
         <dl className="kv">
           <dt>Association set</dt>
-          <dd className="mono" style={{ fontSize: 12.5 }}>
+          <dd className="mono" style={{ fontSize: "var(--t-xs)" }}>
             {live.status === "loading" ? <Skeleton w="20em" /> : d ? d.aspRoot.toString() : "—"}
           </dd>
           <dt>Note tree</dt>
-          <dd className="mono" style={{ fontSize: 12.5 }}>
+          <dd className="mono" style={{ fontSize: "var(--t-xs)" }}>
             {live.status === "loading" ? (
               <Skeleton w="20em" />
             ) : d ? (
@@ -156,10 +156,10 @@ export default function RegisterView({
                     <td>
                       <Redacted width={5} />
                     </td>
-                    <td className="mono" style={{ fontSize: 12 }}>
+                    <td className="mono" style={{ fontSize: "var(--t-xs)" }}>
                       {short(p.aspRoot, 8, 6)}
                     </td>
-                    <td className="mono" style={{ fontSize: 12 }}>
+                    <td className="mono" style={{ fontSize: "var(--t-xs)" }}>
                       {new Date(p.provedAt).toISOString().replace("T", " ").slice(0, 16)}
                     </td>
                     <td>
@@ -219,7 +219,7 @@ function WhyThisMatters({ m }: { m: Measurement }) {
           <h3>Fewer than five holders</h3>
           <p className="stat mono">
             {m.assetsUnderFiveHolders}
-            <span style={{ fontSize: 15, color: "var(--muted)" }}> / {m.assetsWithHolders}</span>
+            <span style={{ fontSize: "var(--t-lg)", color: "var(--muted)" }}> / {m.assetsWithHolders}</span>
           </p>
           <p className="note" style={{ margin: "6px 0 0" }}>{pct}% of assets measured</p>
         </div>
