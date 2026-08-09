@@ -58,16 +58,26 @@ const denyList = new Set(
     .filter((x) => x !== "0"),
 );
 
-const inSet = (addr) =>
-  asp.members.some((m) => m.wallet && m.wallet.toLowerCase() === addr.toLowerCase());
+// Match the LEAF, never the wallet. The published set carries an address for only the
+// twelve members this project operates and reduces the other 512 to leaves — so a wallet
+// match run from a clone finds no witness for anyone else and prints the burn address as
+// "no witness", which is verbatim the claim the README retracts a few lines below as our
+// own bug. Every member carries `sourceKey`, in both the raw build and the public one,
+// and the leaf is what the circuit proves membership of in any case.
+const hasLeaf = (set, addr) => {
+  if (!set) return false;
+  const key = sourceKeyOf(addr).toString();
+  return set.members.some((m) => m.sourceKey === key);
+};
 
 // The set as it stood before the last rebuild. Between a credential changing and the root
 // rotating, this is what the pool was still accepting proofs against — the window the live
 // gate exists to close.
 const prevPath = path.join(ROOT, "asp.previous.json");
 const prev = fs.existsSync(prevPath) ? JSON.parse(fs.readFileSync(prevPath, "utf8")) : null;
-const inPrevSet = (addr) =>
-  !!prev && prev.members.some((m) => m.wallet && m.wallet.toLowerCase() === addr.toLowerCase());
+
+const inSet = (addr) => hasLeaf(asp, addr);
+const inPrevSet = (addr) => hasLeaf(prev, addr);
 
 const label = (addr) =>
   wallets.find((w) => w.address.toLowerCase() === addr.toLowerCase())?.label ?? "";

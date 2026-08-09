@@ -46,7 +46,12 @@ export async function GET(req: Request) {
       subGroup: d.subGroup,
       countries: d.countries ?? [],
       expirationTime: d.expirationTime,
-      cvRecordId: d.cvRecordId,
+      // `cvRecordId` is deliberately NOT forwarded. This route is unauthenticated and takes
+      // any address, so it answers about the whole shared sandbox, not about us — and
+      // `ops/asp.mjs` already refuses to publish other teams' record ids for exactly that
+      // reason. Publishing them one lookup at a time is the same disclosure, retail.
+      // The KYC hash stays: the console renders it as the credential evidence, and
+      // `asp.public.json` carries it for the members this project operates.
       currentKycHash: d.currentKycHash, // the credential evidence, never the PII behind it
     });
   } catch (e) {

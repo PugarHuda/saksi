@@ -90,17 +90,29 @@ export type Measurement = {
   assets: { symbol: string; token: string; holders: number; topShare: number }[];
 };
 
+/** One leaf of the note tree, exactly as the chain describes it.
+ *
+ *  This used to be written from the operator's ledgers, which hold only positions that are
+ *  still LIVE — spending one removes it. So the published bundle WAS the live set, and
+ *  nothing else publishes that: a nullifier is Poseidon(commitment, leafIndex, privKey), so
+ *  without the key it cannot be tied to the commitment it retires, and liveness is not
+ *  otherwise derivable from the chain at all.
+ *
+ *  That single fact broke the register's central claim. Knowing which leaves are live gives
+ *  you which are spent, every 2-in/2-out JoinSplit's inputs then follow by elimination, and
+ *  with the spend graph fixed, conservation turns the public deposit amounts plus one
+ *  disclosed figure into a solvable system. Run against this register it recovered 270.1 CVA
+ *  on leaf 4 — an amount no audit ever disclosed — from public data alone.
+ *
+ *  Every field here is now read from `CommitmentInserted`, which the contract emits once per
+ *  leaf for deposits and transfer outputs alike. Liveness is absent because it is not the
+ *  chain's to give. */
 export type Position = {
   commitment: string;
-  depositTx?: string;
-  provedAt: string;
-  // null on anything that did not enter through deposit(): a JoinSplit output was admitted
-  // under no root at all. Typed as nullable so the compiler catches a deref rather than the
-  // browser — `short(null)` threw and took the whole Register tab down with it.
-  aspRoot: string | null;
-  // How the commitment came to exist: "deposit", or a JoinSplit output — "transact" for the
-  // sender's change and "received" for the recipient's note. Neither JoinSplit output carries
-  // an association-set proof or an entry transaction, so neither may be rendered as one.
-  // Absent on older bundles, where every row was a deposit.
-  origin?: "deposit" | "transact" | "received";
+  leafIndex: number;
+  tx: string;
+  block: number;
+  // A deposit emits Deposited in the same transaction; a transfer output does not. Public
+  // either way, and it says nothing about whether the leaf is still live.
+  origin: "deposit" | "transfer output";
 };

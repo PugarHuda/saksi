@@ -16,7 +16,6 @@ Saksi
 ```
 Pugar Huda Mantoro
 ```
-(Solo builder. Swap for a lab/company name if you'd rather not submit under your own.)
 
 ## Contact Email
 ```

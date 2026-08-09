@@ -48,9 +48,10 @@ privacy pool — destroys the accountability that made the asset legitimate.
    rule is yours, read live, not mirrored on our side.
 3. **The association set is derived from live CVI** — 524 members from a population of 602,
    rebuilt from A-Pass state each run, root anchored on-chain. `ops/gate-gap.mjs` asks your
-   validator about every one of them and reports the direction of any disagreement; it currently
-   names one member you have frozen since we anchored, which is exactly the staleness the live
-   gate exists to close.
+   validator about every one of them and reports the direction of any disagreement; it names the
+   members you have frozen since we anchored — two of them at our last run, with no read left
+   unanswered, since a read your endpoint rate-limits is counted as unknown rather than as
+   agreement — which is exactly the staleness the live gate exists to close.
 4. **Revocation is a rebuild, not a blacklist.** Freeze an A-Pass and the next set is built
    without it; the holder can no longer produce an entry proof.
 5. **A third control:** the entry proof also shows non-membership of an on-chain sanctions
@@ -69,7 +70,7 @@ privacy pool — destroys the accountability that made the asset legitimate.
 | SaksiPool | `0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA` |
 | Saksi Series A Note (our CVA) | `0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B` |
 | Register | 12 commitments · 6 live positions · 2,315 CVA, read at block 52266233 |
-| Tests | 131 passing, 87 of them three adversarial reviews' own exploit POCs |
+| Tests | 173 passing, 87 of them three adversarial reviews' own exploit POCs, plus nine invariants and eighteen fuzz cases |
 
 Both halves run on-chain. One JoinSplit spent two positions of 250 and 480 and created two
 whose amounts appear nowhere (block 52209800). A second redeemed 50 out of the register to a

@@ -143,35 +143,51 @@ if (md) {
   line("| Proof | Question | Request block | Answer block | Verified |");
   line("|---|---|---|---|---|");
 }
+// One row carries a `correction`: an aggregate answered over 3 of 4 live positions and
+// filed as complete. The on-chain answer cannot be retracted, so the table that renders it
+// must say so — the console does and a Playwright test holds it there, and until now the
+// CLI a judge runs from a clone printed the corrected row identically to a clean one.
+// A markdown table cell cannot hold a paragraph, so the note follows the table instead.
+const wrap = (s, w = 84) => (s.match(new RegExp(`.{1,${w}}(\\s|$)`, "g")) ?? [s]).map((l) => l.trim());
+const corrections = [];
+
 for (const a of audit) {
   const req = await receipt(a.requestTx);
   const ver = await receipt(a.verifyTx);
   if (md) {
     line(
-      `| ${a.kind} | ${a.question} | ${req?.block ?? "—"} | ${ver?.block ?? "**never — no proof exists**"} | ${a.verified ? "on-chain" : "request stays open"} |`,
+      `| ${a.kind} | ${a.question} | ${req?.block ?? "—"} | ${ver?.block ?? "**never — no proof exists**"} | ${a.verified ? "on-chain" : "request stays open"}${a.correction ? " · **corrected**" : ""} |`,
     );
+    if (a.correction) corrections.push(`> **Correction** — *${a.question}* — ${a.correction}`);
   } else {
     line(
       `${a.kind.padEnd(10)} req blk ${String(req?.block ?? "-").padEnd(9)} ans blk ${String(ver?.block ?? "NEVER").padEnd(9)} ${a.verified ? "verified" : "unanswerable"}  ${a.question}`,
     );
+    if (a.correction) for (const l of wrap(a.correction)) line(`${" ".repeat(10)}! ${l}`);
   }
 }
+if (md) for (const c of corrections) { line(); line(c); }
 
 line();
-line(md ? "### Positions" : "POSITIONS");
+line(md ? "### Every leaf the tree has taken" : "COMMITMENTS");
 line();
 // The public index no longer carries the wallet that opened each commitment — that was
 // the mapping the console renders as shielded — so the holder count is not derivable here
 // and is not going to be guessed at. Saying "positions" and stopping is the honest report.
-const holders = new Set(notes.map((n) => n.wallet).filter(Boolean).map((w) => w.toLowerCase()));
-line(
-  holders.size
-    ? `${notes.length} shielded positions across ${holders.size} verified holders`
-    : `${notes.length} shielded positions (holders not published in this index)`,
-);
+// Leaves, not positions. The index lists every commitment the tree has ever taken,
+// because listing only the live ones WAS the live set — and an observer holding that can
+// take the spent set by elimination, fix the inputs of every two-in transfer, and solve the
+// arithmetic against the public deposit amounts. Calling these "positions" would put the
+// claim back in words after it was removed from the data.
+line(`${notes.length} commitments inserted, ${notes.filter((n) => n.origin === "deposit").length} of them deposits.`);
+line("Which of them are still held is deliberately not published: publishing it hands an");
+line("observer the spent set by elimination, and the arithmetic follows from there.");
+line();
+// Every field is already in the index, because the index is built from the chain's own
+// insertion log. Twelve receipt fetches to re-derive a block number the row already carries
+// is a slower table that can disagree with itself.
 for (const n of notes) {
-  const r = await receipt(n.depositTx);
-  line(`  ${n.commitment.slice(0, 12)}…  blk ${r?.block ?? "-"}  ${r?.gas?.toLocaleString("en-US") ?? "-"} gas  ${r?.ok ? "ok" : "FAILED"}`);
+  line(`  leaf ${String(n.leafIndex).padStart(2)}  ${n.commitment.slice(0, 12)}…  blk ${n.block}  ${n.origin}`);
 }
 
 line();

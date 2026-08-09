@@ -1,44 +1,86 @@
 [
   {
+    "commitment": "0x14e4204f1f45a2b163801ec03f5cdb6143adfce7364b7f2c31e8ba168e8b42b8",
+    "leafIndex": 0,
+    "tx": "0xdc0da65b298d7e224528e365b4ee960d7fea0676dde495a74f1b323f88a0cecd",
+    "block": 52207987,
+    "origin": "deposit"
+  },
+  {
+    "commitment": "0x2d2b6ebb1eb4d937e1bb469bb35e5c209bbc97487a784d79667ea3582d32e95d",
+    "leafIndex": 1,
+    "tx": "0x5b0900aa342f2ddd7794450d1ae56d13cb7fee3b48919e16aaa8e0ac1f3c4db7",
+    "block": 52208053,
+    "origin": "deposit"
+  },
+  {
     "commitment": "0x2be2c89722f3a2f60be689c70ca5ab5501ac3a68657ef18eee861d1ad390b33f",
-    "depositTx": "0x4afa31f0598d02b460611cb98ed90b1015acda4474dc66493917ab3216010f3c",
-    "provedAt": "2026-08-09T10:15:31.356Z",
-    "aspRoot": "20523674371767629971802187004083499940314105259377807418370303228894354604905",
+    "leafIndex": 2,
+    "tx": "0x4afa31f0598d02b460611cb98ed90b1015acda4474dc66493917ab3216010f3c",
+    "block": 52209344,
     "origin": "deposit"
   },
   {
     "commitment": "0x09f112a4617504488aa2b7d9559d385d10b1b1fe1407ed2a6ffa3cb4793bd163",
-    "depositTx": "0xd553d9792d096cd5aaae1b4f5d40e3c1d07281088793fd4ac96c6563fa8df3ae",
-    "provedAt": "2026-08-09T10:15:38.845Z",
-    "aspRoot": "20523674371767629971802187004083499940314105259377807418370303228894354604905",
+    "leafIndex": 3,
+    "tx": "0xd553d9792d096cd5aaae1b4f5d40e3c1d07281088793fd4ac96c6563fa8df3ae",
+    "block": 52209367,
     "origin": "deposit"
   },
   {
+    "commitment": "0x10d01f5f954002c6bba844a0fd2600d8817269eccc898d27ae027043b5549bea",
+    "leafIndex": 4,
+    "tx": "0x30a74be85a99b68c4bd0a40a1beb7575b0b06686ed610993ed7f6aa38a8cac68",
+    "block": 52209800,
+    "origin": "transfer output"
+  },
+  {
+    "commitment": "0x0324ec66e72b0ed89948a5e213e48aec918d2298e67d9e939d2d489b16d77b1a",
+    "leafIndex": 5,
+    "tx": "0x30a74be85a99b68c4bd0a40a1beb7575b0b06686ed610993ed7f6aa38a8cac68",
+    "block": 52209800,
+    "origin": "transfer output"
+  },
+  {
+    "commitment": "0x19827a78cf2c932077d16293d8244868d9c4f02a27cba963dcfb159865285822",
+    "leafIndex": 6,
+    "tx": "0x08b6801b1cbcaa681f2a81d77628e4c88dcec9bf70793492663fa605422d0e3a",
+    "block": 52220592,
+    "origin": "transfer output"
+  },
+  {
+    "commitment": "0x1e28060badf45d6bbd31ffe69af4256e5fbeb4057473d446925299875857ffe0",
+    "leafIndex": 7,
+    "tx": "0x08b6801b1cbcaa681f2a81d77628e4c88dcec9bf70793492663fa605422d0e3a",
+    "block": 52220592,
+    "origin": "transfer output"
+  },
+  {
+    "commitment": "0x1c44f683272b5c307f0eb564f9a61177a20e1e05f289a99768a1eb6abdb5d161",
+    "leafIndex": 8,
+    "tx": "0x78168fda9282e1d7933c942c102ab2d53b4049a98cda272b0eb7f23167f1291c",
+    "block": 52244580,
+    "origin": "transfer output"
+  },
+  {
     "commitment": "0x052004a1948266b7f480fb13c8c7eb311470ff4515559451c2b2f3c5bbdf15b8",
-    "depositTx": "0x78168fda9282e1d7933c942c102ab2d53b4049a98cda272b0eb7f23167f1291c",
-    "provedAt": "2026-08-09T13:14:22.494Z",
-    "aspRoot": "20523674371767629971802187004083499940314105259377807418370303228894354604905",
-    "origin": "transact"
+    "leafIndex": 9,
+    "tx": "0x78168fda9282e1d7933c942c102ab2d53b4049a98cda272b0eb7f23167f1291c",
+    "block": 52244580,
+    "origin": "transfer output"
   },
   {
     "commitment": "0x21c1afbb46c8d445b362c7e2d8f477ff8e84ab76b9878d97aa3130cadd4712f2",
-    "depositTx": "0xe527ffeff71ef4229bd27fc39a03f4419092763719ef9da3dda11f78edc789e1",
-    "provedAt": "2026-08-09T14:48:37.267Z",
-    "aspRoot": "20523674371767629971802187004083499940314105259377807418370303228894354604905",
+    "leafIndex": 10,
+    "tx": "0xe527ffeff71ef4229bd27fc39a03f4419092763719ef9da3dda11f78edc789e1",
+    "block": 52262994,
     "origin": "deposit"
   },
   {
     "commitment": "0x234f3e846558ff40c0cbabd1622726660919210fab4ec88164b04e49ec084eaa",
-    "depositTx": "0x9bf7ed1423a664ea7006cfefb0b485d4db041e9b3257277f0aa650c2d6d89982",
-    "provedAt": "2026-08-09T14:49:21.191Z",
-    "aspRoot": "20523674371767629971802187004083499940314105259377807418370303228894354604905",
+    "leafIndex": 11,
+    "tx": "0x9bf7ed1423a664ea7006cfefb0b485d4db041e9b3257277f0aa650c2d6d89982",
+    "block": 52263148,
     "origin": "deposit"
-  },
-  {
-    "commitment": "0x1c44f683272b5c307f0eb564f9a61177a20e1e05f289a99768a1eb6abdb5d161",
-    "depositTx": "0x78168fda9282e1d7933c942c102ab2d53b4049a98cda272b0eb7f23167f1291c",
-    "provedAt": "2026-08-09T13:14:22.493Z",
-    "aspRoot": null,
-    "origin": "received"
   }
 ]

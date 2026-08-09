@@ -33,16 +33,20 @@ export default function RegisterView({
             {live.status === "loading" ? <Skeleton w="3em" /> : d ? String(d.positions) : "—"}
           </p>
           <p className="note" style={{ margin: "8px 0 0" }}>
-            {retired !== null && retired >= 0 ? (
+            {retired !== null && retired === 0 ? (
               <>
-                <strong>
-                  {positions.length} listed live · {retired} leaves this bundle does not list
-                </strong>
-                . The tree only grows: spending a note nullifies it but leaves its leaf in
-                place, so this figure counts every commitment the register has ever held. The
-                second number is a subtraction, not a read — a leaf the bundle omits has been
-                spent, or belongs to a holder whose ledger is not published here. Only the
-                first number is something this bundle knows.
+                <strong>{positions.length} listed, every one of them</strong>. The tree only
+                grows: spending a note nullifies it but leaves its leaf in place, so this
+                figure counts every commitment the register has ever held — and the bundle
+                below lists all of them, live and spent alike, because it is built from the
+                chain&apos;s own insertion log rather than from anyone&apos;s ledger.{" "}
+                <strong>Which of them are still held is deliberately not published.</strong>{" "}
+                It used to be, as a side effect of writing this bundle from the operator&apos;s
+                ledgers — and that was enough to unwind the register: knowing the live set
+                gives the spent set, which fixes the inputs of every two-in transfer by
+                elimination, which makes value conservation solvable against the public deposit
+                amounts. 270.1 CVA on leaf 4 was recovered that way, an amount no audit ever
+                disclosed.
               </>
             ) : (
               <>
@@ -140,13 +144,17 @@ export default function RegisterView({
       <section className="card">
         <h2>The register</h2>
         <p className="note">
-          Every row is a live position this contract is holding, and they did not all arrive
-          the same way. A <strong>deposit</strong> row was admitted under the association-set
-          root named beside it, and its entry is public by construction: the transaction in the
-          last column carries a visible sender and a visible ERC-20 amount, so that figure is
-          reconstructible from the chain. A <strong>transfer</strong> row was created inside the
-          register by a JoinSplit — it carries no association-set proof and no entry
-          transaction, because it never entered; it moved.
+          Every leaf this register has ever held, in the order the tree took them — not the
+          ones still held. That distinction is the point: this table used to list only live
+          positions, and a reader who knows which are live knows which are spent, which fixes
+          the inputs of every two-in transfer by elimination and makes the arithmetic solvable.
+          They did not all arrive the same way. A <strong>deposit</strong> row entered through{" "}
+          <code className="mono">deposit()</code>, and its entry is public by construction: the
+          transaction in the last column carries a visible sender and a visible ERC-20 amount,
+          so that figure is reconstructible from the chain and this register does not pretend
+          otherwise. A <strong>transfer</strong> row was created inside the register by a
+          JoinSplit — no association-set proof, no entry transaction, because it never entered;
+          it moved.
         </p>
 
         {positions.length === 0 ? (
@@ -163,19 +171,14 @@ export default function RegisterView({
                   <th scope="col">Commitment</th>
                   <th scope="col">Amount held</th>
                   <th scope="col">Current holder</th>
-                  <th scope="col">Admitted under root</th>
-                  <th scope="col">Created</th>
+                  <th scope="col">Leaf</th>
+                  <th scope="col">Inserted at</th>
                   <th scope="col">Transaction</th>
                 </tr>
               </thead>
               <tbody>
                 {positions.map((p) => {
-                  // No association-set proof is carried by transact(), so NO JoinSplit output
-                  // was "admitted under" a root or has an entry transaction — the sender's
-                  // change ("transact") and the recipient's note ("received") alike. Matching
-                  // the one literal left the received row rendering as a deposit under a root
-                  // that is null in the file, which is what threw inside short().
-                  const moved = (p.origin ?? "deposit") !== "deposit";
+                  const moved = p.origin !== "deposit";
                   return (
                     <tr key={p.commitment}>
                       <td className="mono">
@@ -193,19 +196,13 @@ export default function RegisterView({
                         <Redacted width={5} />
                       </td>
                       <td className="mono" style={{ fontSize: "var(--t-xs)" }}>
-                        {moved ? (
-                          <span className="note">not admitted — never entered</span>
-                        ) : p.aspRoot ? (
-                          short(p.aspRoot, 8, 6)
-                        ) : (
-                          <span className="note">—</span>
-                        )}
+                        {p.leafIndex}
                       </td>
                       <td className="mono" style={{ fontSize: "var(--t-xs)" }}>
-                        {isoMinute(p.provedAt)}
+                        {p.block.toLocaleString("en-US")}
                       </td>
                       <td>
-                        <Tx hash={p.depositTx} label={moved ? "transfer tx" : undefined} />
+                        <Tx hash={p.tx} label={moved ? "transfer tx" : undefined} />
                       </td>
                     </tr>
                   );

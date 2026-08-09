@@ -282,9 +282,12 @@ export default function Landing() {
             <Row label={`Asset (${dep.assetSymbol ?? "CVA"})`} value={dep.asset} explorer />
             <Row label="Cleanverse CVI Validator" value={dep.validator} explorer />
             <Row label="Association set" value={`${dep.aspAdmitted ?? "—"} members admitted`} />
-            {/* Not "shielded positions": the console reads commitmentCount() live, which
-                counts JoinSplit outputs too, so the same label carried two numbers. */}
-            <Row label="Entries recorded" value={`${positions.length}`} />
+            {/* Not "shielded positions": this counts every leaf the tree has ever held,
+                deposits and JoinSplit outputs alike, and how many are still held is not
+                something the bundle publishes — it used to, and that was enough to unwind
+                the transfer graph. "Entries recorded" was already the right label for a
+                number that only ever goes up; it is now also the only one available. */}
+            <Row label="Commitments recorded" value={`${positions.length}`} />
           </dl>
           <p className="cta">
             <Link href="/console" className="btn primary">

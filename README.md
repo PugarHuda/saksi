@@ -92,7 +92,7 @@ proof, so the position cannot be re-entered or topped up. Be precise about the o
 edge, though: the exit is gated on whoever *submits* the transfer, not on the note's
 owner, so an eligible party could relay a revoked holder out. Entry is gated
 cryptographically; the exit is gated operationally, and the difference is real. We ran this end to end:
-see [the demonstrations](#five-demonstrations) below.
+see [the demonstrations](#six-demonstrations) below.
 
 ### Answerability without disclosure
 
@@ -163,10 +163,12 @@ was at most 1,000 when it was in fact 1,680, **no proof could be produced**, and
 `node ops/gate-gap.mjs` asks Cleanverse's validator about **every member of the set**, not a
 sample, and reports the direction of any disagreement — because the set is *derived* from their
 registry and must never be more permissive than it. The root was anchored at 10:07 UTC and the
-sweep currently names **one of the 524 that Cleanverse has frozen since**, plus two it would not
-answer about, counted as unknown rather than as agreement. Gate one refuses that member at
-deposit, so no position can be opened on the stale witness — which is the entire reason gate one
-is a live call and not a cached one.
+sweep names whichever members Cleanverse has frozen since — **two of the 524 at the last run,
+with no read left unanswered**. Do not quote that number, run the script: it moves with their
+registry, and a read their endpoint rate-limits is counted as unknown rather than as agreement,
+so what the sweep reports is a floor on the disagreement and never a clean bill. Gate one
+refuses those members at deposit, so no position can be opened on a stale witness — which is the
+entire reason gate one is a live call and not a cached one.
 
 It was more permissive, earlier today. Fifteen credentials Cleanverse had **frozen** were
 holding valid membership witnesses in our set, because removing a broken server-side status
@@ -189,9 +191,11 @@ sanctions list, which refuses `0x…dEaD` even though both gates admit it.
 **3. Revoke and freeze.** A verified holder deposited, then had its A-Pass frozen
 (`update_status` → live record `status: 2`). Both gates closed independently:
 `complianceVerify(pool, holder)` on Cleanverse's validator went `true → false`, and the
-association set rebuilt without it — recorded in the `dropped` list of `asp.public.json`, with
-the previous set kept in `asp.previous.json`. The next deposit reverts `ValidatorRefused` at gate
-one and has no witness at gate two.
+association set rebuilt without it — recorded in the `dropped` list of `asp.public.json`, whose
+`previousRoot` field is the root the pool was still accepting proofs against until that rebuild.
+Both are in the repo; the raw pre-rebuild set is a local build artefact and is not, because it
+carries other teams' wallets. The next deposit reverts `ValidatorRefused` at gate one and has no
+witness at gate two.
 
 > Reproduce it on a wallet that is frozen **now**, not on that one. The credential used for this
 > run has since been reactivated in Cleanverse's shared sandbox, so `complianceVerify` on it
@@ -259,11 +263,13 @@ path over a separately-keyed note; it does not demonstrate a second party.
 ## Repository
 
 ```
-contracts/     Foundry. SaksiPool + the seven exported Groth16 verifiers. 131 tests.
+contracts/     Foundry. SaksiPool + the seven exported Groth16 verifiers. 173 tests,
+               nine of them invariants driven by a fuzzing handler.
 circuits/      Circom sources, proving keys, witness calculators.
 ops/           The register's operations — issuance, association set, validator
                registration, deposits, disclosures, revocation.
-web/           The three consoles: register, issuer, regulator.
+web/           The console, six tabs: Evidence, Am I eligible?, Register,
+               Two gates, Issuer, Regulator.
 docs/          Cleanverse API notes, findings, the business plan.
 ```
 
@@ -271,7 +277,7 @@ docs/          Cleanverse API notes, findings, the business plan.
 
 ```bash
 # contracts
-cd contracts && forge test          # 131 passed
+cd contracts && forge test          # 173 passed
 
 # ops — install once, then set CV_API_ID / CV_API_KEY and a funded Monad key in .env
 npm install
@@ -325,10 +331,23 @@ builder, the disclosure flow, the deployment, and the consoles.
   `audit-log.json` carries the correction beside the row rather than the row being quietly
   re-run. `ops/audit.mjs` now counts retirements from the chain and refuses when a live
   position belongs to a key that has not contributed an opening.
-- **The ERC-3643 views, the ERC-1400 reason codes and the `TREE_CAPACITY` guard are not
-  deployed.** All are in `SaksiPool.sol` and tested, and all revert on the pool at
-  `0xeBBA114d…`. Redeploying would reset the evidence chain above — two permanently open audit
-  requests whose entire value is that they have been open since a specific block.
+- **The ERC-3643 views, the ERC-1400 reason codes, the `TREE_CAPACITY` guard and the `subject`
+  field on `DisclosureProved` are not deployed.** All are in `SaksiPool.sol` and tested, and all
+  revert — or, for the event, simply do not match — on the pool at `0xeBBA114d…`. Redeploying
+  would reset the evidence chain above: two permanently open audit requests whose entire value
+  is that they have been open since a specific block. The event is the one that bites a third
+  party, because an indexer built from this repo's ABI matches **zero** logs on the live pool:
+
+  ```
+  deployed   DisclosureProved(uint256,uint8,uint256,uint256)
+             0x9579a4d26804d84c8c061d5d86e659dad5bb249b255dffa53cf5983a1c00dec3
+  this repo  DisclosureProved(uint256,uint8,uint256,uint256,uint256)
+             0x06bd1b30042910e35141596b27c70896f579048c77927e10273773a3eda723f8
+  ```
+
+  Index on the deployed topic0; recompute either with `cast keccak "<signature>"`. On the
+  deployed shape the range path spends both value slots on its bounds, so a range answer's log
+  never names the position it was about — which is exactly why the field was added.
 - **Which commitments are live is public.** `notes.public.json` publishes them, so
   set-differencing against `allCommitments()` names the spent ones. What is hidden is which
   input became which output, and what any of them is worth.
@@ -336,9 +355,12 @@ builder, the disclosure flow, the deployment, and the consoles.
   each JoinSplit 37/63 — a constant in a public repository — and deposits are plaintext, so
   every note follows from the deposit log: 730 × 0.37 = 270.1. The splitter now draws from the
   CSPRNG; the notes already inserted do not. Assume these amounts are readable.
-- **`denyList` is an 8-slot fixed array** and the aggregate circuit is fixed at 5 slots, which
-  the register's five live positions now exactly fill. Merkle depth 10 caps every tree at
-  1,024 leaves.
+- **`denyList` is an 8-slot fixed array** and the aggregate circuit is fixed at 5 slots — and
+  the register now holds **six** live positions, so the ceiling is already crossed: an
+  aggregate over the whole register no longer fits in one proof, and every aggregate answer
+  from here is a statement about a named subset. Widening the circuit is a recompile and a
+  new ceremony; the gas law above prices the alternative at ~62,600 gas per extra slot.
+  Merkle depth 10 caps every tree at 1,024 leaves.
 - **Single-EOA owner**, no timelock or multisig, who can rotate roots and set the auditor.
 - Everything is Monad testnet, and the Cleanverse sandbox is shared across hackathon teams,
   so the association set contains other participants' credentials as well as ours. That is

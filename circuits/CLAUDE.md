@@ -3,8 +3,10 @@
 Seven Circom 2.1.6 circuits on BN254, Groth16. Merkle depth 10 → **1024 leaves,
 and that is a real ceiling** on both the note tree and the association set.
 
-Build artefacts live in `build/` (gitignored: zkeys are large and the ceremony
-is not reproducible from this repo alone).
+Build artefacts live in `build/` and are **committed** — 21 files, every zkey,
+wasm and verification key. Deliberate: the ceremony is not reproducible from
+this repo alone, so shipping the keys is the only way a reader can check a
+proof. `git ls-files circuits/build` is the list.
 
 ## The note scheme — shared by every circuit
 

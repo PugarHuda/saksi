@@ -192,8 +192,10 @@ cast call 0xaC7e5179C2C7f03f209136886c172eb34F161792 \
 
 > "So why two gates, if they mostly agree? Because they diverge in **time**. The anchored root
 > is a snapshot; credentials move continuously. Freeze one and the live call refuses
-> immediately, while the anchored root still admits until I rebuild. The sweep shows exactly
-> one member in that window right now. Neither gate subsumes the other."
+> immediately, while the anchored root still admits until I rebuild. The sweep counts whoever is
+> in that window right now — two, the last time I ran it, and a read their endpoint rate-limits
+> counts as unknown rather than as agreement, so that number is a floor. Neither gate subsumes
+> the other."
 
 > "Honest boundary, and it is in the summary: entry is gated cryptographically, the exit is
 > gated operationally. The transfer circuit has no association-set input and the proof is not

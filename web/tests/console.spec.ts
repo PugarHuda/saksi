@@ -205,15 +205,21 @@ test("a transfer output is not rendered as a deposit", async ({ page }) => {
   await page.goto("/console");
   await page.getByRole("tab", { name: "Register" }).click();
 
-  // Both JoinSplit outputs — the sender's change and the recipient's note. Rendering either
-  // as a deposit claims an admission under a root that never happened, and the recipient's
-  // row carries a null root, which threw inside short() and took the whole tab down.
+  // Every JoinSplit output the register has ever held — three transfers, two outputs each.
+  // Rendering one as a deposit claims an entry that never happened.
+  //
+  // The count used to be 2, because the table listed only positions still live and four of
+  // the six had been spent again. It lists all twelve leaves now: publishing which are live
+  // was what let an observer take the spent set by elimination and solve the transfer graph.
+  // So this number moving from 2 to 6 IS the fix, and the test says so rather than being
+  // quietly retuned.
   const moved = page.getByRole("row").filter({ hasText: "created by transfer" });
-  await expect(moved).toHaveCount(2);
-  for (let i = 0; i < 2; i++) {
-    await expect(moved.nth(i).getByText("not admitted — never entered")).toBeVisible();
+  await expect(moved).toHaveCount(6);
+  for (let i = 0; i < 6; i++) {
     await expect(moved.nth(i).getByRole("link", { name: "transfer tx" })).toBeVisible();
   }
+  // And no row anywhere may say whether its position is still held.
+  await expect(page.getByRole("row").filter({ hasText: /\b(live|retired|spent|unspent)\b/i })).toHaveCount(0);
   expect(problems, problems.join("\n")).toEqual([]);
 });
 

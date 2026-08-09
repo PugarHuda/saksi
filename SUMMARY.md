@@ -47,9 +47,11 @@ deposits and moves a position, an *issuer* builds the eligibility set and anchor
    10:07 UTC (the census an hour earlier enumerated 562, which is why the two differ), rebuilt
    every run, root anchored on-chain. `ops/gate-gap.mjs` asks the validator about **all 524** and
    reports the direction of any disagreement, because a set derived from their registry must never
-   be *more permissive* than it. It currently names one member frozen since the root was anchored,
-   and two it would not answer about, counted as unknown rather than agreement — the staleness gate
-   one exists to close. Earlier today fifteen were frozen and the check sampled four addresses.
+   be *more permissive* than it. It names whichever members have been frozen since the root was
+   anchored — two at the last run, with no read left unanswered — and counts a read their endpoint
+   rate-limits as unknown rather than as agreement, so the figure is a floor that moves with their
+   registry and is worth re-running rather than quoting. That is the staleness gate one exists to
+   close. Earlier today fifteen were frozen and the check sampled four addresses.
 4. **Revocation is a rebuild, not a blacklist.** Freeze an A-Pass and the next set is built
    without it; the holder can no longer produce an entry proof.
 5. **A third, independent control** — the entry circuit proves non-membership of an on-chain
@@ -68,7 +70,7 @@ deposits and moves a position, an *issuer* builds the eligibility set and anchor
 | SaksiPool | [`0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA`](https://testnet.monadexplorer.com/address/0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA) |
 | Saksi Series A Note (our CVA) | [`0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B`](https://testnet.monadexplorer.com/address/0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B) |
 | Register | 12 commitments · 6 live positions · 2,315 CVA backed, at block 52266233 |
-| Foundry tests | **131 passing**, 87 of them three adversarial reviews' own exploit POCs |
+| Foundry tests | **173 passing** — 87 of them three adversarial reviews' own exploit POCs, plus nine invariants and eighteen fuzz cases from a fourth |
 
 The register is still being deposited into, so those four figures are stamped with the block they
 were read at rather than left to rot. `node ops/evidence.mjs` prints the current ones, and
@@ -91,8 +93,11 @@ and published neither output (block 52209800) until the auditor asked and block 
 disclosed 459.9, ten blocks later. A second *redeemed* 50 out (block 52220592) — 49.5 to a
 credentialed recipient, 0.5 to a credentialed relayer — calling Cleanverse's validator twice more
 on that path, because their model holds that every address receiving a CVA needs a credential.
-Deposits come from more than one credentialed wallet: the most recent, 420 CVA at block 52262994,
-was opened by a different EOA. Nothing links an input to an output on any of the three transfers.
+Deposits come from more than one credentialed wallet: leaves 10 and 11 — 420 CVA at block
+52262994 and 265 CVA at block 52263148 — were opened by two EOAs, neither of them the issuer.
+Naming the leaves rather than "the latest" because the register keeps taking deposits; `node
+ops/evidence.mjs` prints the head of the list. Nothing links an input to an output on any of the
+three transfers.
 
 ## The strongest evidence is a refusal
 
@@ -169,9 +174,15 @@ by rebuild, and an auditor who can compel a bounded answer and get a *recorded n
 - **Answer authority does not move with a position.** Every disclosure circuit takes `(amount,
   pubKey, blinding)` and no private key, so anyone holding a note's opening — including whoever
   built the output — can prove things about it.
-- **The ERC-3643 views, the reason codes and the `TREE_CAPACITY` guard are not deployed.** All are
-  in `SaksiPool.sol` and tested, and all revert on the live pool; redeploying would reset the two
-  permanently open audit requests whose entire value is that they have been open since a block.
+- **The ERC-3643 views, the reason codes, the `TREE_CAPACITY` guard and the `subject` field on
+  `DisclosureProved` are not deployed.** All are in `SaksiPool.sol` and tested, and all revert on
+  the live pool; redeploying would reset the two permanently open audit requests whose entire
+  value is that they have been open since a block. The event is the one that bites a third party:
+  the repo ABI hashes to `0x06bd1b30…` (`DisclosureProved(uint256,uint8,uint256,uint256,uint256)`)
+  and the deployed logs carry `0x9579a4d2…` (`DisclosureProved(uint256,uint8,uint256,uint256)`),
+  so an indexer built from this repo matches **zero** events. Index on `0x9579a4d2…`; recompute
+  either with `cast keccak`. On that shape a range answer's log does not name its subject, both
+  value slots going to the bounds — which is why the field exists.
 - **Which commitments are live is public**, and an earlier version of this page implied otherwise:
   `notes.public.json` publishes them, so set-differencing against `allCommitments()` names the
   spent ones. What is hidden is which input became which output, and what any is worth.
@@ -198,8 +209,9 @@ by rebuild, and an auditor who can compel a bounded answer and get a *recorded n
   caveat, not a hole.
 - **The revocation demonstration is historical.** The credential it froze has been reactivated in
   Cleanverse's shared sandbox, so a live `complianceVerify` on that wallet returns true today; the
-  drop is in `asp.public.json`, the superseded set in `asp.previous.json`. Other credentials are
-  frozen right now and both gates refuse them.
+  drop is in `asp.public.json`, and the root it superseded is that file's `previousRoot` — the
+  raw pre-rebuild set is a local build artefact carrying other teams' wallets and is not
+  published. Other credentials are frozen right now and both gates refuse them.
 - **The transfer circuit bounds amounts to 248 bits, every disclosure circuit to 64.** A JoinSplit
   merging notes past 2⁶⁴ could never be disclosed. Unreachable at this size; one line to close.
 - **We leaked our own secrets twice.** Testnet note keys for a superseded pool reached the public
@@ -209,7 +221,7 @@ by rebuild, and an auditor who can compel a bounded answer and get a *recorded n
 
 ## What the tests prove, and what an adversarial review found
 
-The 131 Foundry tests run against a mock verifier returning a settable boolean: they prove the
+The 173 Foundry tests run against a mock verifier returning a settable boolean: they prove the
 contract's logic, not the Groth16 cryptography. The chain proves the cryptography instead — every
 deposit, transfer, withdrawal and disclosure above was accepted by a deployed verifier whose key
 is committed here. Eighty-seven are three adversarial reviews' own exploit proofs, kept as

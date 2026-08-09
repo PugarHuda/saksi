@@ -41,27 +41,34 @@ for (const entry of files) {
   }
   let data = JSON.parse(fs.readFileSync(src, "utf8"));
 
-  // notes.json holds the secrets that open each commitment, and the wallet that created
-  // it. The console renders the holder column as shielded, so shipping the mapping in
-  // the same bundle would make the interface contradict itself. It publishes that a
-  // position exists and when — never who, and never how to open it.
+  // The source of this file is now `ops/publish-index.mjs`, which reads it out of the
+  // chain's own CommitmentInserted log and never opens a ledger, so there is nothing here
+  // to redact — every field is already public to anyone with an RPC endpoint. The
+  // whitelist stays anyway: it is what stops a future field from reaching the browser
+  // because somebody added it upstream, and this list is cheaper to review than the
+  // producer is.
   //
-  // Note honestly: entry is public by construction. The deposit transaction has a
-  // visible sender and moves a visible ERC-20 amount, so anyone reading the chain can
-  // reconstruct this mapping for the entry itself. What the register conceals is the
-  // book AFTER positions move, which is where a JoinSplit breaks the link. Withholding
-  // it here is about not doing the observer's work for them, not about a guarantee.
+  // The names are load-bearing. This mapping used to spell the OLD field names, and after
+  // the producer changed, every row shipped as a lone `commitment` with the rest undefined
+  // — JSON.stringify drops those — so the Register tab threw on the first row and took the
+  // console down. A whitelist silently rewrites the shape it does not recognise.
+  //
+  // Note honestly: entry is public by construction. The deposit transaction has a visible
+  // sender and moves a visible ERC-20 amount, so anyone reading the chain can reconstruct
+  // that mapping for the entry itself. What the register conceals is the book AFTER
+  // positions move, which is where a JoinSplit breaks the link — and which is why liveness
+  // is no longer published here at all.
   if (f === "notes.json") {
-    data = data.map((n) => ({
-      commitment: n.commitment,
-      depositTx: n.depositTx,
-      provedAt: n.provedAt,
-      aspRoot: n.aspRoot,
-      // `origin` says whether a commitment was deposited or created by a shielded transfer.
-      // It reveals nothing the transaction hash does not, and without it the console
-      // rendered transfer outputs as deposits — under a root they were never admitted by.
-      origin: n.origin,
-    }));
+    const KEEP = ["commitment", "leafIndex", "tx", "block", "origin"];
+    const missing = data.length
+      ? KEEP.filter((k) => data[0][k] === undefined)
+      : [];
+    if (missing.length) {
+      console.error(`sync-data: notes.public.json has no ${missing.join(", ")} — regenerate it`);
+      console.error("with `node ops/publish-index.mjs`. Refusing to ship rows the console cannot render.");
+      process.exit(1);
+    }
+    data = data.map((n) => Object.fromEntries(KEEP.map((k) => [k, n[k]])));
   }
   fs.writeFileSync(dst, JSON.stringify(data, null, 2));
   console.log(`sync-data: ${f}`);

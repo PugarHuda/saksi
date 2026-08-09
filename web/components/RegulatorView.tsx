@@ -38,13 +38,12 @@ export default function RegulatorView({
 }) {
   const answered = audit.filter((a) => a.verified);
   const exact = audit.filter((a) => a.kind === "exact");
-  // The newest position on file. Every position-specific audit here was asked about a
-  // commitment that has since been spent, so an audit older than this is not a statement
-  // about anything currently on screen — say so rather than let the two tables imply it.
-  const newestPosition = positions.reduce<string | null>(
-    (max, p) => (max === null || p.provedAt > max ? p.provedAt : max),
-    null,
-  );
+  // There used to be a line here telling the reader that the commitment behind an older
+  // answer "has since been spent". It was inferred from timestamps in a bundle that only
+  // listed live positions — and that bundle no longer says which leaves are live, because
+  // publishing it let an observer solve the whole transfer graph by elimination. The
+  // inference is gone with the signal it rested on, which is correct: whether a named
+  // position is still held is exactly the thing this register does not disclose unasked.
 
   return (
     <div className="grid">
@@ -125,14 +124,6 @@ export default function RegulatorView({
                         {a.at.replace("T", " ").slice(0, 16)} UTC · proved in {a.proveMs} ms
                       </span>
                     </div>
-
-                    {newestPosition && a.at < newestPosition && (
-                      <p className="note" style={{ margin: "0 0 8px" }}>
-                        Asked before the newest position existed — the commitment behind this
-                        answer has since been spent, so it is not one of the rows on the
-                        Register tab.
-                      </p>
-                    )}
 
                     <p style={{ margin: "0 0 4px" }}>
                       <span style={{ color: "var(--muted)" }}>Question — </span>

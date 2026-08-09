@@ -73,7 +73,7 @@ export function useLive(deployment: Deployment) {
 
 export type ApassLookup =
   | { found: true; status: number; tier: string; subTier: number; group: string; subGroup: string;
-      countries: string[]; expirationTime: number; cvRecordId: string; currentKycHash: string }
+      countries: string[]; expirationTime: number; currentKycHash: string }
   | { found: false; code?: string; message?: string }
   | { error: string };
 
