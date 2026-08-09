@@ -225,6 +225,30 @@ const txHash = txHashOf(out);
 artifact.depositTx = txHash;
 saveNote(artifact);
 fs.writeFileSync(path.join(ROOT, ".artifacts", "last-deposit.json"), JSON.stringify(artifact, null, 2));
+// A deposit inserts a leaf, and a leaf outside the published note root has no Merkle path —
+// so the position cannot be spent until someone advances the root. transfer.mjs republishes
+// before it spends and therefore self-heals; a deposit does not, so every position entered
+// since the last publish sat unspendable with nothing saying so. Two of them did.
+//
+// One owner transaction. The alternative is a register that quietly accepts value it cannot
+// move, which is the failure a holder discovers at exactly the wrong moment.
+{
+  const { makePoseidon, buildTree } = await import("./merkle.mjs");
+  const wl = JSON.parse(fs.readFileSync(path.join(ROOT, "wallets.json"), "utf8"));
+  const owner = [...wl].reverse().find((w) => w.label === "issuer" && w.priv)
+    ?? { priv: process.env.DEPLOYER_PK };
+  const onChain = cast(["call", dep.pool, "allCommitments()(bytes32[])", "--rpc-url", RPC])
+    .replace(/[[\]\s]/g, "").split(",").filter(Boolean).map((c) => BigInt(c));
+  const { h2 } = await makePoseidon();
+  const root = buildTree(h2, onChain, asp.levels ?? 10).root.toString();
+  if (cast(["call", dep.pool, "knownNoteRoot(uint256)(bool)", root, "--rpc-url", RPC]).trim() !== "true") {
+    console.log("\nadvancing the note root so this position can be spent…");
+    const out = cast(["send", dep.pool, "publishNoteRoot(uint256)", root,
+      "--rpc-url", RPC, "--chain", "10143", "--private-key", owner.priv]);
+    console.log("  " + out.split("\n").filter((l) => /^(status|blockNumber)/.test(l)).join("  "));
+  }
+}
+
 console.log(`\nposition recorded. tx ${txHash}`);
 
 // snarkjs leaves worker threads alive, so the process will not exit on its own.
