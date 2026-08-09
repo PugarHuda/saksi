@@ -1,0 +1,338 @@
+/* The deck. Loaded only on /deck.
+ *
+ * Every selector is scoped under .d-deck, including the scroll container itself, so nothing
+ * here can reach the landing page or the console after a client-side navigation — a
+ * `scroll-snap-type` left on <html> would have followed the reader home.
+ *
+ * No colour and no font-size below is a literal: colours are the tokens from globals.css and
+ * every size either is a --t-* step or is derived from one by calc(). The display face is the
+ * one place a size leaves the scale, exactly as .display on the landing does, because a
+ * headline that has to hold a screen at 1280 has nowhere on a 28px ceiling to stand. */
+
+.d-deck {
+  height: 100dvh;
+  /* Belt and braces for the one defect this page cannot ship with. A slide that overflows
+     is a layout bug to fix, not to hide, so the widths are checked at 375/768/1280 — this
+     line is what stops a future long hash from turning the whole deck sideways anyway. */
+  overflow-x: hidden;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .d-deck { scroll-behavior: smooth; }
+}
+
+.d-slide {
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: clamp(18px, 2.4vw, 34px) clamp(20px, 4vw, 60px) 0;
+  scroll-snap-align: start;
+  scroll-snap-stop: always;
+}
+
+.d-body {
+  align-items: center;
+  display: flex;
+  flex: 1;
+  padding: 18px 0 22px;
+  width: 100%;
+}
+
+/* The split. Left is the claim in the display face; right is what backs it — figures,
+   addresses, a table. One idea a screen, and the evidence never leaves the same screen as
+   the sentence it supports. */
+.d-grid {
+  align-items: start;
+  display: grid;
+  gap: clamp(22px, 3.2vw, 54px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.06fr);
+  margin: 0 auto;
+  max-width: 1240px;
+  width: 100%;
+}
+
+.d-grid.wide { grid-template-columns: minmax(0, 1fr); }
+
+.d-eyebrow {
+  color: var(--muted);
+  font-size: var(--t-2xs);
+  letter-spacing: 0.22em;
+  margin: 0 0 18px;
+  text-indent: 0.22em;
+  text-transform: uppercase;
+}
+/* Gold marks the thing a reader must not miss, and on this deck that is the integration
+   section — the five slides the whole submission is judged hardest on. It is used for
+   nothing else here. */
+.d-eyebrow.gold { color: var(--accent); }
+
+.d-h {
+  font-family: var(--font-display), "Iowan Old Style", Georgia, serif;
+  font-size: clamp(var(--t-2xl), 3.5vw, calc(var(--t-2xl) * 1.75));
+  font-weight: 400;
+  letter-spacing: 0.004em;
+  line-height: 1.09;
+  margin: 0 0 18px;
+  max-width: 20ch;
+}
+/* The four slides whose claim sits above a full-width table get a longer measure — a
+   headline broken over four lines above a table reads as a caption. */
+.d-h.long { max-width: 36ch; }
+
+.d-gap { margin-top: 20px; }
+
+.d-sub {
+  color: var(--muted);
+  font-size: var(--t-lg);
+  line-height: 1.62;
+  margin: 0 0 12px;
+  max-width: 48ch;
+}
+.d-sub strong { color: var(--foreground); font-weight: 600; }
+.d-sub em { color: var(--foreground); font-style: italic; }
+
+.d-note {
+  color: var(--muted);
+  font-size: var(--t-xs);
+  line-height: 1.6;
+  margin: 14px 0 0;
+  max-width: 68ch;
+}
+.d-note code { font-size: var(--t-2xs); overflow-wrap: anywhere; }
+
+/* ---- evidence blocks ---------------------------------------------------- */
+
+/* A measured figure and what it measures. A rule per row rather than a card per figure:
+   four bordered boxes in a grid is the shape of a slide nobody chose a layout for. */
+.d-figs {
+  border-top: 1px solid var(--border);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.d-figs li {
+  align-items: baseline;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 12px 18px;
+  justify-content: space-between;
+  padding: 10px 0;
+}
+.d-figs .k { color: var(--muted); font-size: var(--t-sm); min-width: 0; }
+.d-figs .v {
+  font-size: var(--t-xl);
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+.d-figs .v.small { font-size: var(--t-md); font-weight: 500; letter-spacing: 0; white-space: normal; overflow-wrap: anywhere; }
+.d-figs .v.gold { color: var(--accent); }
+/* `a { color: inherit }` in globals.css is right for a page of prose and wrong for a link
+   sitting inside a figure, where nothing else marks it as one. */
+.d-figs .v a,
+.d-note a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; }
+.d-figs .v a:hover,
+.d-note a:hover { border-bottom-color: var(--accent); }
+
+/* A numbered sequence — the gates, in the order the transaction runs them. */
+.d-steps { counter-reset: d-step; list-style: none; margin: 0; padding: 0; }
+.d-steps > li {
+  border-top: 1px solid var(--border);
+  padding: 14px 0 14px 34px;
+  position: relative;
+}
+.d-steps > li::before {
+  color: var(--accent);
+  content: counter(d-step, decimal-leading-zero);
+  counter-increment: d-step;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: var(--t-xs);
+  left: 0;
+  position: absolute;
+  top: 16px;
+}
+.d-steps h3 { font-size: var(--t-md); font-weight: 600; margin: 0 0 5px; }
+.d-steps p { color: var(--muted); font-size: var(--t-sm); line-height: 1.6; margin: 0; }
+.d-steps code { font-size: var(--t-2xs); overflow-wrap: anywhere; }
+
+/* A plain list of statements, ruled. Used for the limits and for the two-sided
+   "what the chain sees" column. */
+.d-list { list-style: none; margin: 0; padding: 0; }
+.d-list > li {
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: var(--t-sm);
+  line-height: 1.6;
+  padding: 10px 0;
+}
+.d-list > li strong { color: var(--foreground); font-weight: 600; }
+.d-list code { font-size: var(--t-2xs); overflow-wrap: anywhere; }
+.d-list.tight > li { padding: 8px 0; font-size: var(--t-xs); }
+
+/* Two columns of limits at width, one on a phone. The limits slide is the longest on the
+   deck and it is not allowed to be the one that scrolls. */
+.d-cols { columns: 2; column-gap: clamp(22px, 3vw, 44px); }
+.d-cols > li { break-inside: avoid; }
+
+.d-sect {
+  color: var(--muted);
+  font-size: var(--t-2xs);
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  margin: 0 0 4px;
+  text-indent: 0.18em;
+  text-transform: uppercase;
+}
+.d-sect.seen { color: var(--foreground); }
+.d-sect.unseen { color: var(--shielded); }
+
+.d-pair { display: grid; gap: clamp(18px, 2.4vw, 34px); grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); }
+
+/* An address or a root the reader is meant to be able to check. Never truncated on this
+   deck: it is printed to PDF and a shortened hash in a PDF is decoration. */
+.d-addr { font-size: var(--t-xs); overflow-wrap: anywhere; }
+.d-addr a { color: var(--accent); text-decoration: none; border-bottom: 1px solid transparent; }
+.d-addr a:hover { border-bottom-color: var(--accent); }
+
+.d-quote {
+  border-left: 2px solid var(--accent);
+  font-family: var(--font-display), Georgia, serif;
+  font-size: var(--t-xl);
+  line-height: 1.4;
+  margin: 0 0 18px;
+  max-width: 40ch;
+  padding-left: 16px;
+}
+
+.d-open { color: var(--refused); font-weight: 500; }
+.d-yes { color: var(--verified); }
+.d-hid { color: var(--shielded); }
+
+/* ---- tables -------------------------------------------------------------- */
+
+.d-table td, .d-table th { font-size: var(--t-xs); }
+/* globals.css uppercases every <th> because there it is only ever a column label. Here the
+   row header is the sentence — an auditor's question, a circuit's call name — and
+   `PROVEEXACT` is not a thing anyone can look up. */
+.d-table tbody th[scope="row"] { letter-spacing: 0; text-transform: none; }
+.d-table td.num { font-size: var(--t-xs); white-space: nowrap; }
+.d-table tr.open th, .d-table tr.open td { background: var(--accent-soft); }
+
+/* ---- the rail ------------------------------------------------------------
+   Real anchors with real hrefs, rendered per slide on the server. Every one of them works
+   with JavaScript switched off, which is the only reason the deck can claim to. */
+
+.d-rail {
+  align-items: center;
+  border-top: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  margin: 0 auto;
+  max-width: 1240px;
+  padding: 4px 0 8px;
+  width: 100%;
+}
+.d-rail a,
+.d-rail .off {
+  align-items: center;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: var(--t-xs);
+  letter-spacing: 0.1em;
+  min-height: 40px;
+  padding: 8px 10px;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+.d-rail a:hover { color: var(--foreground); }
+.d-rail .off { opacity: 0.35; }
+.d-count {
+  color: var(--muted);
+  font-size: var(--t-2xs);
+  letter-spacing: 0.18em;
+  text-indent: 0.18em;
+}
+
+/* ---- cover ---------------------------------------------------------------- */
+
+.d-cover { text-align: center; }
+.d-cover .display { margin-inline: auto; }
+.d-cover .d-sub { margin: 0 auto 26px; max-width: 44ch; text-align: center; }
+.d-meta {
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  font-size: var(--t-xs);
+  gap: 6px 22px;
+  justify-content: center;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.d-hint {
+  color: var(--muted);
+  font-size: var(--t-2xs);
+  letter-spacing: 0.14em;
+  margin: 26px 0 0;
+  text-indent: 0.14em;
+  text-transform: uppercase;
+}
+
+.d-links { display: flex; flex-wrap: wrap; gap: 10px; margin: 22px 0 0; }
+
+@media (max-width: 900px) {
+  .d-grid { grid-template-columns: minmax(0, 1fr); }
+  .d-cols { columns: 1; }
+  .d-h, .d-h.long { max-width: none; }
+
+  /* Stacked, a slide's two panels sit one above the other and several run past the
+     viewport. `mandatory` + `scroll-snap-stop: always` then fights the reader for control
+     of a slide they are still halfway down, so the deck relaxes into the stacked document
+     it already is on a phone — which is the same shape it takes with scripting off and on
+     paper. */
+  .d-deck { scroll-snap-type: y proximity; }
+  .d-slide { scroll-snap-stop: normal; }
+}
+
+/* A phone in landscape, or a short laptop: a slide taller than the viewport must scroll
+   inside itself rather than be clipped by the snap container. */
+@media (max-height: 560px) {
+  .d-deck { scroll-snap-type: none; }
+  .d-slide { min-height: 0; }
+}
+
+/* ---- print ----------------------------------------------------------------
+   One slide per page. This is what gets emailed. */
+
+@media print {
+  .d-deck {
+    display: block;
+    height: auto;
+    overflow: visible;
+    scroll-snap-type: none;
+  }
+  .d-slide {
+    border-bottom: 0;
+    break-after: page;
+    /* vh resolves against the page box here, so the slide fills its sheet and .d-body
+       centres the content on it. Below 100 so a hairline of rounding never spills a
+       one-page slide onto a second, blank one. */
+    min-height: 92vh;
+    /* Not 0: at zero the first and last characters of every row sit on the trim, and the
+       @page margin reads as an accident rather than as a margin. */
+    padding: 0 6mm;
+    page-break-after: always;
+  }
+  .d-slide:last-of-type { break-after: auto; page-break-after: auto; }
+  .d-body { padding: 0; }
+  .d-rail, .d-hint { display: none; }
+  .d-grid { gap: 20px; }
+  .d-cols { columns: 2; }
+  /* A URL that only exists as a hover target is lost on paper. */
+  .d-addr a { border-bottom: 0; }
+  @page { margin: 14mm; size: landscape; }
+}
