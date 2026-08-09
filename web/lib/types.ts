@@ -29,12 +29,17 @@ export type AspMember = {
   label?: string | null;
 };
 
+export type SetChange = { wallet: string; tier: string | number; label?: string | null };
+
 export type Asp = {
   root: string;
+  previousRoot?: string | null;
   levels: number;
   builtAt: string;
   admitted: number;
   populationQueried: number;
+  dropped?: SetChange[];
+  added?: SetChange[];
   rule: { minTier: number; countries: string[]; requireActive: boolean };
   members: AspMember[];
 };

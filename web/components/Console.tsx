@@ -6,10 +6,12 @@ import { useLive } from "@/lib/useLive";
 import RegisterView from "./RegisterView";
 import IssuerView from "./IssuerView";
 import RegulatorView from "./RegulatorView";
+import GatesView from "./GatesView";
 import { Badge } from "./bits";
 
 const TABS = [
   { id: "register", label: "Register" },
+  { id: "gates", label: "Two gates" },
   { id: "issuer", label: "Issuer" },
   { id: "regulator", label: "Regulator" },
 ] as const;
@@ -81,6 +83,7 @@ export default function Console({
         {tab === "register" && (
           <RegisterView deployment={deployment} live={live} positions={positions} />
         )}
+        {tab === "gates" && <GatesView deployment={deployment} asp={asp} />}
         {tab === "issuer" && <IssuerView deployment={deployment} live={live} asp={asp} />}
         {tab === "regulator" && (
           <RegulatorView deployment={deployment} audit={audit} positions={positions} />
