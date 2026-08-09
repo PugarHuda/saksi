@@ -20,7 +20,7 @@ import path from "node:path";
 import { keccak_256 } from "./keccak.mjs";
 import { makePoseidon, buildTree } from "./merkle.mjs";
 import { client } from "./cleanverse.mjs";
-import { CHAIN, ROOT, readDeployment, writeDeployment } from "./env.mjs";
+import { CHAIN, ROOT, readAsp, readDeployment, writeDeployment } from "./env.mjs";
 
 // Constructed inside `build`, not here. deposit.mjs and gate-gap.mjs import sourceKeyOf
 // from this file and never touch the API — a client at module top level made both of them
@@ -253,10 +253,16 @@ if (isCli && cmd === "build") {
 }
 
 else if (isCli && cmd === "show") {
-  const a = JSON.parse(fs.readFileSync(FILE, "utf8"));
+  // Not FILE. asp.json is gitignored — it carries other teams' wallets — so in a clone the
+  // only set on disk is asp.public.json, and reading the raw path ended `show` in an ENOENT
+  // trace on the one command a reader runs first.
+  const a = readAsp();
   console.log(`root ${a.root}   ${a.admitted} members   built ${a.builtAt}`);
   for (const m of a.members.slice(0, 15)) {
-    console.log(`  [${String(m.index).padStart(3)}] ${m.wallet}  tier ${m.tier}  ${m.countries.join(",")}`);
+    // A member this project does not operate is published as a leaf and carries no wallet.
+    // Interpolating the absent field printed a column of `undefined` under `show`.
+    const who = m.wallet ?? `leaf ${m.sourceKey.slice(0, 24)}…`;
+    console.log(`  [${String(m.index).padStart(3)}] ${who}  tier ${m.tier}  ${(m.countries ?? []).join(",")}`);
   }
   if (a.members.length > 15) console.log(`  … ${a.members.length - 15} more`);
 }

@@ -41,14 +41,6 @@ const send = (args, key = pk) => {
   const out = cast(["send", ...args, "--rpc-url", RPC, "--chain", "10143", "--private-key", key]);
   return { tx: txHashOf(out), ok: succeeded(out), out };
 };
-if (!pk) {
-  console.error("DEPLOYER_PK is not set — this signs transactions. Fill in .env (see README).");
-  process.exit(1);
-}
-if (!dep.pool) {
-  console.error("deployment.json has no `pool` — deploy first, then run ops/setup-pool.mjs.");
-  process.exit(1);
-}
 
 const LOG = path.join(ROOT, "audit-log.json");
 const readLog = () => (fs.existsSync(LOG) ? JSON.parse(fs.readFileSync(LOG, "utf8")) : []);
@@ -162,11 +154,24 @@ async function proveAndSend({ circuit, input, selector, sig, question, ctx, kind
 }
 
 const notes = loadNotes();
-if (!notes.length) { console.error("no positions in notes.json — run ops/deposit.mjs first"); process.exit(1); }
-
 const { h2, h3, poseidon, F } = await makePoseidon();
 const hN = (arr) => F.toObject(poseidon(arr));
 const [cmd, ...args] = process.argv.slice(2);
+
+// `list` reads audit-log.json and nothing else — it needs no key, no pool and no positions.
+// Demanding them made the one command a fresh clone can actually run fail on a missing .env.
+if (cmd !== "list") {
+  if (!notes.length) { console.error("no positions in notes.json — run ops/deposit.mjs first"); process.exit(1); }
+  if (!pk) {
+    console.error("DEPLOYER_PK is not set — proving is local but the disclosure is a transaction.");
+    console.error("Fill in .env (see README).");
+    process.exit(1);
+  }
+  if (!dep.pool) {
+    console.error("deployment.json has no `pool` — deploy first, then run ops/setup-pool.mjs.");
+    process.exit(1);
+  }
+}
 const nonce = BigInt(Date.now()) % FIELD;
 // Pin the locale: the host default renders 1000 as "1.000", which in an audit pack
 // reads as one token rather than a thousand.

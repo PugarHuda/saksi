@@ -39,31 +39,31 @@ deposits and moves a position; an *issuer* builds the eligibility set and anchor
 
 ## CVI · CVA integration points
 
-1. **Gate one is Cleanverse's contract, not ours.** The pool is registered with the CVI
-   Compliance Validator (`0xaC7e5179…`) and `deposit()` calls `complianceVerify(pool,
-   msg.sender)` on it, live, inside the transaction that moves value. An unregistered pool
-   reverts rather than returning false, so the register fails closed.
-2. **The asset is a real CVA.** `SAKSIAZEV` was issued through `atoken/launch` carrying a
-   `min_tier 30` rule from issuance. `activeRules()` on our pool forwards to
-   `getRulesV2()` on theirs and returns `(0x0000, 0x0000, 30, 0, false, 0)` — the rule is
-   theirs, read live, not a copy kept in step here.
-3. **The association set is derived from live CVI.** 524 members admitted from a population
-   of 602 at 10:07 UTC — the census an hour earlier enumerated 562, which is why the two
-   figures differ — rebuilt from A-Pass state on every run, root anchored on-chain.
-   `ops/gate-gap.mjs` asks the validator about **every one of the 524** and reports the
-   direction of any disagreement: a set derived from their registry must never be *more
-   permissive* than it. Earlier today fifteen frozen credentials were in it and the check was
-   sampling four addresses.
+1. **Gate one is Cleanverse's contract, not ours.** `deposit()` calls `complianceVerify(pool,
+   msg.sender)` on the CVI Compliance Validator (`0xaC7e5179…`) live, inside the transaction
+   that moves value. An unregistered pool reverts rather than returning false, so the register
+   fails closed.
+2. **The asset is a real CVA.** `SAKSIAZEV` was issued through `atoken/launch` carrying
+   `min_tier 30` from issuance; `activeRules()` forwards to `getRulesV2()` on theirs and returns
+   `(0x0000, 0x0000, 30, 0, false, 0)` — their rule, read live, not a copy kept in step here.
+3. **The association set is derived from live CVI** — 524 members admitted from a population of
+   602 at 10:07 UTC (the census an hour earlier enumerated 562, which is why the two differ),
+   rebuilt from A-Pass state every run, root anchored on-chain. `ops/gate-gap.mjs` asks the
+   validator about **every one of the 524** and reports the direction of any disagreement: a set
+   derived from their registry must never be *more permissive* than it. Earlier today fifteen
+   frozen credentials were in it and the check was sampling four addresses.
 4. **Revocation is a rebuild, not a blacklist.** Freeze an A-Pass and the next set is built
    without it; the holder can no longer produce an entry proof.
-5. **A third, independent control.** The entry circuit also proves non-membership of an
-   on-chain sanctions list, which carries a real entry — the burn address, which both gates
-   admit and only this control refuses.
-6. **It answers in ERC-3643's shape.** `isVerified(address)` and
-   `canTransfer(from,to,amount)` compose all three entry controls in T-REX's spelling, so an
-   existing integration can query this register without knowing anything about it. T-REX
-   carries most of the tokenized-RWA supply in existence, which makes it the cheapest
-   adoption path from the incumbent. **Written and tested, not deployed** — see limits.
+5. **A third, independent control** — the entry circuit proves non-membership of an on-chain
+   sanctions list, which carries a real entry: the burn address, which both gates admit and only
+   this refuses.
+6. **It answers in ERC-3643's shape, with ERC-1400 reason codes.** `isVerified(address)` and
+   `canTransfer(from,to,amount)` compose all three entry controls in T-REX's spelling — the
+   cheapest adoption path from the incumbent, which carries most of the tokenized-RWA supply in
+   existence. `canTransferWithReason` adds an ERC-1066 status byte and a reason, because this
+   register refuses for three quite different causes — credential, anchored set, sanctions list —
+   and an integrator handed a bare `false` cannot tell which, though each demands a different
+   action. **Written and tested, not deployed**; see limits.
 
 ## What is deployed and exercised
 
@@ -71,26 +71,31 @@ deposits and moves a position; an *issuer* builds the eligibility set and anchor
 |---|---|
 | SaksiPool | [`0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA`](https://testnet.monadexplorer.com/address/0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA) |
 | Saksi Series A Note (our CVA) | [`0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B`](https://testnet.monadexplorer.com/address/0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B) |
-| Register | 10 commitments · 4 live positions · 1,630 CVA backed · two holders |
-| Foundry tests | **128 passing**, 84 of them three adversarial reviews' own exploit POCs |
+| Register | 11 commitments · 5 live positions · 2,050 CVA backed |
+| Foundry tests | **131 passing**, 87 of them three adversarial reviews' own exploit POCs |
 
-**A position changed owner.** Until this afternoon every JoinSplit output was keyed to the
-sender's own fresh key: the mechanism ran, but nothing had ever moved between people. A second
-holder generated their own spending key (`ops/keygen.mjs`), gave the sender only the public
-half, and was paid an output — tx `0x78168fda…`, block 52244580. That note is not in the
-sender's ledger and its key never was, so only its owner can spend it. **Then the new owner
-answered a regulator's question about it alone** (blocks 52244758 → 52244768), proving the
-position is at most 600 without disclosing it. Be precise about the boundary: *spend authority*
-moved. The sender built the output and so knows the amount they sent, which is inherent to any
-note scheme.
+**This register can mint a position the minting process cannot spend.** Until this afternoon
+every JoinSplit output was keyed to the sender's own fresh key. Then `ops/keygen.mjs` generated
+a spending key held in a separate ledger, the sender was given only its public half, and a
+JoinSplit paid an output to it — `0x78168fda…`, block 52244580. The private half is not in the
+sender's ledger and never was, so the sender cannot spend that position.
+
+Say only that much. An adversarial review took the stronger claim apart and it deserved it: the
+recipient is a key in a file, with no address and no credential; both transactions were signed
+by the same wallet; and every disclosure circuit takes `(amount, pubKey, blinding)` and no
+private key, so whoever holds the opening — including the sender, who built it — can still
+*answer* about the position. **Spend authority separated; answer authority did not.** A real
+second holder needs their own credentialed wallet, their own gas, and a disclosure circuit that
+binds the spending key. That is the honest distance between this and custody transfer.
 
 **Value enters and leaves under the same rules.** One JoinSplit spent two of the issuer's
 positions of 250 and 480 and published neither output (block 52209800) until the auditor asked
 and block 52210355 disclosed 459.9, ten blocks after the request. A second *redeemed* 50 out of
 the register (block 52220592) — 49.5 to a credentialed recipient, 0.5 to a credentialed relayer
-— and that path calls Cleanverse's validator twice more, because their model holds that every
-address receiving a CVA needs a credential. Nothing links an input to an output on any of the
-three.
+— calling Cleanverse's validator twice more on that path, because their model holds that every
+address receiving a CVA needs a credential. Deposits come from more than one credentialed
+wallet: the most recent, 420 CVA at block 52262994, was opened by a different EOA from the
+issuer's. Nothing links an input to an output on any of the three transfers.
 
 ## The strongest evidence is a refusal
 
@@ -106,15 +111,16 @@ checkable with any RPC endpoint:
 | inside the 400–500 bracket? | 52210670 | 52210679 · proved, figure hidden |
 | total exposure ≤ 2,000? | 52210870 | 52210883 · proved, no position disclosed |
 | **total exposure ≤ 1,000?** | **52210907** | **never — those positions summed to 1,680** |
-| the new holder's position at most 600? | 52244758 | 52244768 · proved *by its owner*, figure hidden |
-| total exposure across "all 3"? | 52245857 | 52245878 · proved over 3 of 4 live positions — see limits |
+| the separately-keyed position at most 600? | 52244758 | 52244768 · proved, figure hidden |
+| total exposure across "all 3"? | 52245857 | 52245878 · **answered, then corrected** — see limits |
 
-The register cannot answer falsely. It can only fail to answer, and the failure is on the
-record permanently. The English is not decoration either: each figure is hashed into
-`auditClaim` on-chain before an answer exists, so `claimHash(kind, cap)` recomputed from the
-words — "at most 500", "the 400–500 bracket" — equals what the contract stored. A reader can
-check that the question asked is the question the contract will accept an answer to, without
-trusting this document.
+Five clean answers, two that can never be given, and one that was given wrongly and cannot be
+taken back. The register cannot answer falsely; it can answer a narrower question than its words
+claimed, and the record of that is as permanent as the rest. The English is not decoration
+either: each figure is hashed into `auditClaim` before an answer exists, so `claimHash(kind,
+cap)` recomputed from the words — "at most 500", "the 400–500 bracket" — equals what the
+contract stored, so a reader can check that the question asked is the question the contract will
+accept an answer to without trusting this document.
 
 ## Scalability — the ceilings, priced
 
@@ -161,75 +167,72 @@ bounded answer and get a *recorded non-answer*.
 
 ## Honest limits
 
-- **Entry is public.** `deposit()` takes a plaintext amount from a visible sender. The
+- **Entry is public.** `deposit()` takes a plaintext amount from a visible sender; the
   commitment buys confidentiality over a position's *life*, not at its creation.
 - **The exit is gated operationally, not cryptographically.** The transfer circuit carries no
   association-set input and the proof is not bound to `msg.sender`, so an eligible party could
-  relay a revoked holder's exit. Closing it is a recompile and a new ceremony — roughly a day,
-  not a patch. Two tests assert this rather than pretending it is closed.
-- **The aggregate is single-prover, and we broke that today.** Block 52245878 answered "total
-  exposure across all **3** registered positions" while four were live — the fourth being the
-  new holder's, which the issuer's ledger cannot open. A subset was reported as a total, it is
-  permanently on-chain, and it is exactly the cherry-picking this design exists to refuse.
-  `ops/audit.mjs` now takes the retirement count from the chain instead of inferring it from
-  "commitments this ledger cannot open", which was circular, and refuses outright when a live
-  position belongs to a holder who has not contributed their opening. A real multi-holder
-  concentration cap needs multi-party proving, which this does not have.
-- **The ERC-3643 views are not deployed.** They are in `SaksiPool.sol` and compile, but
-  `isVerified` and `canTransfer` revert on the pool at `0xeBBA114d…`, as does the
-  `TREE_CAPACITY` guard below. Redeploying would reset the evidence chain above — two
-  permanently open audit requests whose entire value is that they have been open since a
-  specific block.
+  relay a revoked holder's exit. A recompile and a new ceremony to close — a day, not a patch.
+  Two tests assert it rather than pretending it is closed.
+- **The aggregate is single-prover, and we published a wrong answer proving it.** Block 52245878
+  answered "total exposure across all **3** registered positions" while four were live — the
+  enumerator reclassified the fourth, separately keyed, as *retired*, because it derived the
+  retirement count from what the issuer's ledger could open, which is circular. The answer is
+  true of the three it names and is not a statement about the register. It cannot be retracted,
+  so `audit-log.json` carries the correction beside it rather than the row being re-run quietly.
+  `ops/audit.mjs` now counts retirements from the chain and refuses outright when a live position
+  belongs to a key that has not contributed an opening. A real multi-holder concentration cap
+  needs multi-party proving; this has none.
+- **The ERC-3643 views, the reason codes and the `TREE_CAPACITY` guard are not deployed.** All
+  are in `SaksiPool.sol` and tested; `isVerified`, `canTransfer` and `canTransferWithReason`
+  revert on the live pool. Redeploying would reset the evidence chain above — two permanently
+  open audit requests whose entire value is that they have been open since a specific block.
+- **Answer authority does not move with a position.** Every disclosure circuit takes `(amount,
+  pubKey, blinding)` and no private key, so anyone holding a note's opening can prove things
+  about it — including the party that created the output. Separating spend from answer needs the
+  spending key bound into the disclosure circuits, which is a recompile and a new ceremony.
 - **Which commitments are live is public**, and an earlier version of this page implied
-  otherwise. `notes.public.json` publishes the issuer's live commitments and the new holder's
-  is named in its own audit request, so set-differencing against `allCommitments()` identifies
-  the spent ones. What is hidden is which input became which output, and what any of them are
-  worth.
-- **The four positions on chain today are arithmetically derivable, and that is our bug, not
-  the design's.** `ops/transfer.mjs` split each JoinSplit 37/63 — a constant in a public
-  repository — and deposits are plaintext, so anyone can compute every note from the deposit
-  log: 730 × 0.37 = 270.1, down to a checksum that matches the pool's balance. The splitter now
-  draws from the CSPRNG, but the notes already inserted were created under the old one. Assume
-  this register's amounts are readable; the property is only as good as the randomness the
-  operator's tooling supplies, and ours was not random until an audit said so.
-- **The note root is owner-published.** `merkleUpdate.circom` exists and is keyed but is not
-  wired to `publishNoteRoot`, so nothing on-chain ties the root to `commitments[]`. Every leaf
-  is emitted, so a wrong root is *detectable*; it is not *prevented*. Every root ever published
-  also stayed spendable, and because a nullifier binds the leaf *index*, republishing a tree
-  that moved an existing commitment would mint a second valid nullifier for the same note. The
-  builder is append-only so this never happened; the contract does not enforce it.
-- **One trust domain in the setup.** Three contributions and a closing beacon, all snarkjs
-  defaults — one operator, one machine. If that operator kept the phase-2 randomness, forged
+  otherwise. `notes.public.json` publishes the issuer's live commitments and the new holder's is
+  named in its own audit request, so set-differencing against `allCommitments()` identifies the
+  spent ones. What is hidden is which input became which output, and what any is worth.
+- **This register's amounts are derivable, and that is our bug, not the design's.**
+  `ops/transfer.mjs` split each JoinSplit 37/63 — a constant in a public repository — and
+  deposits are plaintext, so anyone can compute every note from the deposit log: 730 × 0.37 =
+  270.1, down to a checksum matching the pool's balance. The splitter now draws from the CSPRNG;
+  the notes already inserted do not. Assume these amounts are readable. The property is only as
+  good as the operator's randomness, and ours was not random until an audit said so.
+- **The note root is owner-published.** `merkleUpdate.circom` is keyed but unwired, so nothing
+  on-chain ties the root to `commitments[]`; every leaf is emitted, so a wrong root is
+  *detectable*, not *prevented*. Every root ever published also stayed spendable, and since a
+  nullifier binds the leaf *index*, republishing a tree that moved a commitment would mint a
+  second valid nullifier for the same note. The builder is append-only so it never happened; the
+  contract does not enforce it.
+- **One trust domain in the setup** — three contributions and a closing beacon, all snarkjs
+  defaults, one operator, one machine. If that operator kept the phase-2 randomness, forged
   proofs are possible and undetectable.
-- **Both gates root in one authority.** They diverge in *time*, not in trust: a compromised
-  Cleanverse sandbox defeats both. **Single-EOA owner**, no timelock or multisig, who can
-  rotate roots and set the auditor.
-- **The tree can be filled for the price of gas, and the fix is in the source rather than on
-  the chain.** A zero-amount input skips the Merkle check — that is how a 1-in transfer is
-  expressed in a fixed 2-in circuit — but nothing stopped a transaction being *all* dummies
-  while still inserting two commitments, so any wallet the pool admits could append leaves for
-  gas alone. Every deposit landing past leaf 1023 is then unspendable forever, because
-  `inLeafIndex` is `Num2Bits(levels)`-bounded and no witness exists for it. `transfer.circom`
-  now requires at least one real input and `SaksiPool` now reverts rather than losing value
-  silently; **neither is deployed**, and at 10 of 1,024 leaves the attack is 507 transactions
-  away. Tested at `contracts/test/Audit3.t.sol`; stated here rather than quietly shipped.
-- **A spent position can still answer an audit.** `_requireKnown` consults the commitment set
-  and structurally cannot consult the nullifier set — deriving one from the other on-chain is
-  exactly what the design prevents. The auditor picks the subject, so this is a caveat to state
-  rather than a hole to plug.
+- **Both gates root in one authority**, diverging in *time* rather than trust, so a compromised
+  Cleanverse sandbox defeats both. **Single-EOA owner**, no timelock or multisig, who rotates
+  roots and sets the auditor.
+- **The tree can be filled for the price of gas, and the fix is in the source, not on the
+  chain.** A zero-amount input skips the Merkle check — how a 1-in transfer is expressed in a
+  fixed 2-in circuit — but nothing stopped an all-dummy transaction still inserting two
+  commitments, and every deposit past leaf 1023 is unspendable forever because `inLeafIndex` is
+  `Num2Bits(levels)`-bounded. `transfer.circom` now demands one real input and `SaksiPool` now
+  reverts instead of losing value silently; **neither is deployed**, and at 10 of 1,024 leaves the
+  attack is 507 transactions away. Tested at `contracts/test/Audit3.t.sol`.
+- **A spent position can still answer an audit.** `_requireKnown` consults the commitment set and
+  structurally cannot consult the nullifier set — deriving one from the other on-chain is what
+  the design prevents. The auditor picks the subject, so this is a caveat, not a hole.
 - **The revocation demonstration is historical.** The credential it froze has since been
-  reactivated in Cleanverse's shared sandbox, so a live `complianceVerify` on that wallet now
-  returns true; the drop is recorded in `asp.public.json` and the superseded set in
-  `asp.previous.json`. Other credentials are frozen right now and both gates refuse them, which
-  is what `ops/gate-gap.mjs` shows.
-- **The transfer circuit bounds amounts to 248 bits while every disclosure circuit bounds
-  them to 64.** A JoinSplit that merged notes past 2⁶⁴ would spend and redeem normally and
-  could never be disclosed. Unreachable at this register's size; one line in
-  `transfer.circom` to close.
-- **We leaked our own secrets twice.** Testnet note keys for a superseded pool reached the
-  public repo and survived two history rewrites, because GitHub serves orphaned commits by
-  SHA. The repository was destroyed and recreated to purge the object store. Zero key reuse
-  into the live pool; treat those seven notes as burned.
+  reactivated in Cleanverse's shared sandbox, so a live `complianceVerify` on that wallet returns
+  true today; the drop is recorded in `asp.public.json`, the superseded set in
+  `asp.previous.json`. Other credentials are frozen right now and both gates refuse them.
+- **The transfer circuit bounds amounts to 248 bits while every disclosure circuit bounds them to
+  64.** A JoinSplit merging notes past 2⁶⁴ would spend and redeem normally and could never be
+  disclosed. Unreachable at this size; one line to close.
+- **We leaked our own secrets twice.** Testnet note keys for a superseded pool reached the public
+  repo and survived two history rewrites, because GitHub serves orphaned commits by SHA. The
+  repository was destroyed and recreated to purge the object store. Zero key reuse into the live
+  pool; treat those seven notes as burned.
 
 ## What the tests prove, and what an adversarial review found
 
