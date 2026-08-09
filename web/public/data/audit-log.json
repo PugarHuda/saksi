@@ -46,5 +46,29 @@
     "verified": true,
     "proveMs": 1077,
     "at": "2026-08-09T05:52:00.676Z"
+  },
+  {
+    "kind": "aggregate",
+    "question": "is total exposure across all 4 registered positions at most 1,000 SAKSIAZEV?",
+    "circuit": "aggregateDisclosure",
+    "contextHash": "4172399395728267862344368135647205553892654568312955565958716110246645639638",
+    "answer": "no — no proof exists for this claim, so the request stays open",
+    "requestTx": "0x34519e323c25cbc8916a9da2734077e5a0f4a33f5e4aee2e52d5bc8628b9ead2",
+    "verifyTx": null,
+    "verified": false,
+    "proveMs": 66,
+    "at": "2026-08-09T06:19:55.336Z"
+  },
+  {
+    "kind": "aggregate",
+    "question": "is total exposure across all 4 registered positions at most 1,500 SAKSIAZEV?",
+    "circuit": "aggregateDisclosure",
+    "contextHash": "3447960072424246640504630460755333038711613420462834192843133923054391926445",
+    "answer": "yes — sum of 4 positions <= 1,500, no individual position disclosed",
+    "requestTx": "0xe3a0a27aa58c7cd56f04a24efcf249ed6d617631f6ab2d238bbc46148b3c62cd",
+    "verifyTx": "0x924d8288bbd59871cd0567657e84ed2f3ca5808138fa8bd0411158274575ab1e",
+    "verified": true,
+    "proveMs": 950,
+    "at": "2026-08-09T06:20:00.396Z"
   }
 ]

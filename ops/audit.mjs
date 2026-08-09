@@ -64,7 +64,27 @@ async function proveAndSend({ circuit, input, selector, sig, question, ctx, kind
 
   console.log(`proving (${circuit})…`);
   const t0 = Date.now();
-  const { proof, publicSignals } = await snarkjs.groth16.fullProve(input, wasm, zkey);
+  let proof, publicSignals;
+  try {
+    ({ proof, publicSignals } = await snarkjs.groth16.fullProve(input, wasm, zkey));
+  } catch (e) {
+    // A cap that actually binds has no witness. The register cannot answer "yes" to a
+    // question whose answer is no — there is no proof to produce, so the request stays
+    // open on-chain and the failure is the honest outcome rather than an error.
+    const ms = Date.now() - t0;
+    console.log(`  NO PROOF EXISTS — the claim is false (${(e.message ?? "").split("\n")[0]})`);
+    appendLog({
+      kind, question, circuit,
+      contextHash: ctx.toString(),
+      answer: "no — no proof exists for this claim, so the request stays open",
+      requestTx: req.tx,
+      verifyTx: null,
+      verified: false,
+      proveMs: ms,
+      at: new Date().toISOString(),
+    });
+    return { ok: false };
+  }
   const ms = Date.now() - t0;
   if (!(await snarkjs.groth16.verify(vkey, publicSignals, proof))) {
     throw new Error("proof does not verify locally");
@@ -101,7 +121,9 @@ const { h2, h3, poseidon, F } = await makePoseidon();
 const hN = (arr) => F.toObject(poseidon(arr));
 const [cmd, ...args] = process.argv.slice(2);
 const nonce = BigInt(Date.now()) % FIELD;
-const toDisplay = (units) => (Number(units) / 1e6).toLocaleString();
+// Pin the locale: the host default renders 1000 as "1.000", which in an audit pack
+// reads as one token rather than a thousand.
+const toDisplay = (units) => (Number(units) / 1e6).toLocaleString("en-US");
 
 if (cmd === "threshold") {
   const capUnits = BigInt(Math.round(Number(args[0] ?? 500) * 1e6));
