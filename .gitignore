@@ -15,3 +15,8 @@ web/.vercel/
 
 # Holder secrets that open a commitment. The redacted index is notes.public.json.
 notes.json
+
+# Internal handoff notes - contain sandbox credentials.
+docs/HANDOFF.md
+# Cleanverse's own documentation is access-code gated; not ours to republish.
+docs/docs-cleanverse.txt
