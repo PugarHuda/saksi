@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { short } from "@/lib/chain";
+import { isoDay, short } from "@/lib/chain";
 import type { Asp, Deployment } from "@/lib/types";
 import { useEligibility, type useLive } from "@/lib/useLive";
 import { Addr, Badge, Empty, ErrorBox, Skeleton, Tx } from "./bits";
@@ -169,17 +169,20 @@ export default function IssuerView({
                   <dd className="mono">
                     {result.apass.tier} / sub {result.apass.subTier}
                   </dd>
+                  {/* Every field below is optional in practice. A credential answer that
+                      says found:true and omits the rest is a shape this sandbox really
+                      returns, and `new Date(NaN).toISOString()` throws RangeError rather
+                      than rendering badly — which unmounted the whole React tree and left
+                      the console reading "This page couldn't load". One missing field took
+                      down every tab, so each is rendered defensively and an absent value
+                      shows as an em dash. */}
                   <dt>Countries</dt>
-                  <dd className="mono">{result.apass.countries.join(", ") || "—"}</dd>
+                  <dd className="mono">{result.apass.countries?.join(", ") || "—"}</dd>
                   <dt>Expires</dt>
-                  <dd className="mono">
-                    {new Date(Number(result.apass.expirationTime) * 1000)
-                      .toISOString()
-                      .slice(0, 10)}
-                  </dd>
+                  <dd className="mono">{isoDay(result.apass.expirationTime)}</dd>
                   <dt>KYC hash</dt>
                   <dd className="mono" style={{ fontSize: "var(--t-xs)" }}>
-                    {short(result.apass.currentKycHash, 12, 8)}
+                    {result.apass.currentKycHash ? short(result.apass.currentKycHash, 12, 8) : "—"}
                   </dd>
                 </dl>
               ) : (
@@ -224,10 +227,16 @@ export default function IssuerView({
               <dd className="mono">{asp.builtAt.replace("T", " ").slice(0, 19)} UTC</dd>
               <dt>Root anchored</dt>
               <dd>
-                {d && d.aspRoot.toString() === asp.root ? (
-                  <Badge tone="ok">Matches the chain</Badge>
-                ) : live.status === "loading" ? (
+                {/* "Rebuilt" is a claim about a MISMATCH, and it needs both roots to make
+                    it. The error branch fell through to it, so an unreachable RPC reported
+                    that the published set had drifted from the chain — while the two agreed
+                    exactly. A read that did not happen is not a disagreement. */}
+                {live.status === "loading" ? (
                   <Skeleton w="8em" />
+                ) : !d ? (
+                  <Badge tone="warn">Could not read the chain to compare</Badge>
+                ) : d.aspRoot.toString() === asp.root ? (
+                  <Badge tone="ok">Matches the chain</Badge>
                 ) : (
                   <Badge tone="warn">Rebuilt — rotate the root to anchor it</Badge>
                 )}

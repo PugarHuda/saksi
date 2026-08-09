@@ -24,7 +24,7 @@ import { execFileSync } from "node:child_process";
 import * as snarkjs from "snarkjs";
 import { makePoseidon } from "./merkle.mjs";
 import { loadNotes, loadAllNotes, FIELD } from "./note.mjs";
-import { CAST, ROOT, RPC, readDeployment, succeeded, txHashOf } from "./env.mjs";
+import { CAST, ROOT, RPC, readDeployment, succeeded, txHashOf, writeJson } from "./env.mjs";
 
 const dep = readDeployment();
 const AGG_SLOTS = 5;
@@ -44,11 +44,10 @@ const send = (args, key = pk) => {
 
 const LOG = path.join(ROOT, "audit-log.json");
 const readLog = () => (fs.existsSync(LOG) ? JSON.parse(fs.readFileSync(LOG, "utf8")) : []);
-const appendLog = (e) => {
-  const all = readLog();
-  all.push(e);
-  fs.writeFileSync(LOG, JSON.stringify(all, null, 2) + "\n");
-};
+// Atomic: a truncated audit-log.json is not just a lost row. readOrExit parses this file in
+// evidence.mjs, gas.mjs and lifecycle.mjs, and readLog parses it on every later audit — so a
+// half-written log takes the whole record and four other scripts down with it.
+const appendLog = (e) => writeJson(LOG, [...readLog(), e]);
 
 const build = (name) => ({
   wasm: path.join(ROOT, `circuits/build/${name}_js/${name}.wasm`),
@@ -94,6 +93,16 @@ async function proveAndSend({ circuit, input, selector, sig, question, ctx, kind
     `  requestAudit  ${req.ok ? "ok" : "FAILED"}  ${req.tx}` +
     (auditorPk === pk ? "   (WARNING: signed by the issuer's own key)" : "   signed by the auditor"),
   );
+  // `FAILED` was printed and the script carried on: a full proving run and a second
+  // gas-paying transaction that the contract must refuse, because the request it answers
+  // was never opened. Worse, the refusal then landed in audit-log.json carrying the
+  // affirmative `answer` string, so the record read as a question that had been put and
+  // rejected rather than as one that was never asked.
+  if (!req.ok) {
+    console.error("  the question was not registered — refusing to prove an answer to it.");
+    console.error(req.out.slice(0, 600));
+    process.exit(1);
+  }
 
   console.log(`proving (${circuit})…`);
   const t0 = Date.now();

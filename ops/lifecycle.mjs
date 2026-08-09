@@ -16,7 +16,7 @@ import "./env.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { CAST, ROOT, RPC, readDeployment, readOrExit } from "./env.mjs";
+import { CAST, ROOT, RPC, readDeployment, readOrExit, writeJson } from "./env.mjs";
 
 const dep = readDeployment();
 const cast = (args) => execFileSync(CAST, [...args, "--rpc-url", RPC], { encoding: "utf8" });
@@ -111,6 +111,6 @@ if (answers?.requestBlock && answers.requestBlock >= answers.block) {
   throw new Error("the disclosure precedes its own request — refusing to publish");
 }
 
-fs.writeFileSync(path.join(ROOT, "lifecycle.json"), JSON.stringify(out, null, 2) + "\n");
+writeJson(path.join(ROOT, "lifecycle.json"), out);
 console.log(`\n${out.steps.length} steps, blocks ${blocks[0]} → ${blocks[blocks.length - 1]}`);
 console.log("written to lifecycle.json");

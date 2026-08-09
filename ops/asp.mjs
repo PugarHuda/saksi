@@ -20,7 +20,7 @@ import path from "node:path";
 import { keccak_256 } from "./keccak.mjs";
 import { makePoseidon, buildTree } from "./merkle.mjs";
 import { client } from "./cleanverse.mjs";
-import { CHAIN, ROOT, readAsp, readDeployment, writeDeployment } from "./env.mjs";
+import { CHAIN, ROOT, readAsp, readDeployment, writeDeployment, writeJson } from "./env.mjs";
 
 // Constructed inside `build`, not here. deposit.mjs and gate-gap.mjs import sourceKeyOf
 // from this file and never touch the API — a client at module top level made both of them
@@ -148,12 +148,7 @@ if (isCli && cmd === "build") {
         .map((r) => ({ wallet: r.walletAddress, tier: r.tier, label: r.label ?? null }))
     : [];
 
-  if (previous) {
-    fs.writeFileSync(
-      path.join(ROOT, "asp.previous.json"),
-      JSON.stringify(previous, null, 2) + "\n",
-    );
-  }
+  if (previous) writeJson(path.join(ROOT, "asp.previous.json"), previous);
 
   const { h2 } = await makePoseidon();
   const leaves = admitted.map((r) => sourceKeyOf(r.walletAddress));
@@ -186,7 +181,7 @@ if (isCli && cmd === "build") {
       registeredAt: r.registeredAt,
     })),
   };
-  fs.writeFileSync(FILE, JSON.stringify(out, null, 2) + "\n");
+  writeJson(FILE, out);
 
   // The public variant. The set is derived from a sandbox shared with every other team,
   // so most members are other people's wallets. Republishing their addresses and record
@@ -240,7 +235,7 @@ if (isCli && cmd === "build") {
       "Members not operated by this project are published as leaves only. The set is built " +
       "from a sandbox shared across teams; their wallet addresses are not ours to republish.",
   };
-  fs.writeFileSync(path.join(ROOT, "asp.public.json"), JSON.stringify(publicOut, null, 2) + "\n");
+  writeJson(path.join(ROOT, "asp.public.json"), publicOut);
 
   writeDeployment({ aspRoot: out.root, aspBuiltAt: out.builtAt, aspAdmitted: out.admitted });
 

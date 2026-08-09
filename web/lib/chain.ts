@@ -181,13 +181,28 @@ export async function blockOf(hash: string): Promise<number | null> {
   return n;
 }
 
+/** `eth_call` against a contract that does not exist, or does not have this selector, does
+ *  NOT revert — it answers `0x`. Every reader here wants a VALUE, and there is no void call
+ *  on this console, so an empty return is always a wrong address or a wrong ABI and never a
+ *  legitimate answer. Rendering it as one produced confident falsehoods: `readAddress` built
+ *  the string `"0x0x"` out of it, two of those compared EQUAL, and the evidence tab accused
+ *  the issuer of auditing themselves. `readUint` mapped it to 0, and the masthead printed
+ *  "Not registered" about a register it had failed to reach.
+ *
+ *  One throw at the boundary rather than a guard in each of the nine call sites — the ones
+ *  that legitimately tolerate an absent value already carry `.catch`. */
 export async function call(to: string, data: string): Promise<string> {
-  return rpc("eth_call", [{ to, data }, "latest"]);
+  const out = await rpc<string>("eth_call", [{ to, data }, "latest"]);
+  if (!out || out === "0x") {
+    throw new Error(
+      "That address returned nothing for this call — it is not the contract this console expects.",
+    );
+  }
+  return out;
 }
 
 export async function readUint(to: string, selector: string, arg?: string): Promise<bigint> {
-  const out = await call(to, selector + (arg ? pad(arg) : ""));
-  return BigInt(out === "0x" ? "0x0" : out);
+  return BigInt(await call(to, selector + (arg ? pad(arg) : "")));
 }
 
 export async function readBool(to: string, selector: string, arg?: string): Promise<boolean> {
@@ -196,6 +211,9 @@ export async function readBool(to: string, selector: string, arg?: string): Prom
 
 export async function readAddress(to: string, selector: string): Promise<string> {
   const out = await call(to, selector);
+  // A full word, or the last 40 characters are not an address — they are whatever the tail
+  // of a shorter answer happens to be.
+  if (out.length < 66) throw new Error("The contract returned a short word where an address was expected.");
   return "0x" + out.slice(-40);
 }
 
@@ -204,6 +222,25 @@ export const addrUrl = (a: string) => `${EXPLORER}/address/${a}`;
 
 export const short = (s: string, head = 8, tail = 6) =>
   s.length <= head + tail + 2 ? s : `${s.slice(0, head)}…${s.slice(-tail)}`;
+
+/** A date, or an em dash — never a thrown RangeError and never 1970.
+ *
+ *  `new Date(x).toISOString()` throws on an unparseable x, and React has no boundary here,
+ *  so one missing `expirationTime` in a credential answer unmounted the entire console and
+ *  left it reading "This page couldn't load" on every tab. The quieter half of the same bug:
+ *  `new Date(null)` is VALID and renders 1970-01-01, so a position whose `provedAt` the
+ *  public index left null was being given a confident, wrong timestamp.
+ *
+ *  `seconds` is for the Unix seconds the credential registry returns; the string form is for
+ *  the ISO stamps the ops scripts write. */
+function usable(d: Date) {
+  return Number.isFinite(d.getTime()) ? d : null;
+}
+export const isoDay = (v: number | string | null | undefined) =>
+  (v === null || v === undefined || v === "" ? null : usable(new Date(Number(v) * 1000)))
+    ?.toISOString().slice(0, 10) ?? "—";
+export const isoMinute = (v: string | null | undefined) =>
+  (v ? usable(new Date(v)) : null)?.toISOString().replace("T", " ").slice(0, 16) ?? "—";
 
 /** 6-decimal fixed point, grouped. Amounts that are shielded never reach this. */
 export const units = (v: bigint, decimals = 6) => {

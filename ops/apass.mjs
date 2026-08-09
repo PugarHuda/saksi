@@ -23,13 +23,15 @@ import fs from "node:fs";
 import path from "node:path";
 import { secp256k1 } from "./secp.mjs";
 import { client } from "./cleanverse.mjs";
-import { CHAIN, ROOT } from "./env.mjs";
+import { CHAIN, ROOT, writeJson } from "./env.mjs";
 
 const cv = client();
 const FILE = path.join(ROOT, "wallets.json");
 
 const load = () => (fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, "utf8")) : []);
-const save = (w) => fs.writeFileSync(FILE, JSON.stringify(w, null, 2) + "\n");
+// Atomic: wallets.json holds every holder's private key, and a truncated write loses the
+// keys of every wallet already in it — not just the one being appended.
+const save = (w) => writeJson(FILE, w);
 
 /** 12+ chars, A-Za-z0-9 only — the platform rejects anything else. */
 const customerId = (label) =>

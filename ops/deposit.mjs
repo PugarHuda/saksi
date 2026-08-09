@@ -20,18 +20,23 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import * as snarkjs from "snarkjs";
 import { makePoseidon, buildTree } from "./merkle.mjs";
-import { noteTools, randomField, saveNote } from "./note.mjs";
+import { noteTools, randomField, saveNote, writePublicIndex } from "./note.mjs";
 import { sourceKeyOf } from "./asp.mjs";
-import { CAST, ROOT, RPC, readAsp, readDeployment, succeeded, txHashOf } from "./env.mjs";
+import { CAST, ROOT, RPC, readAsp, readDeployment, succeeded, txHashOf, writeJson } from "./env.mjs";
 
 const dep = readDeployment();
 const asp = readAsp();
 // Which holder is entering. The register's whole point is that several PEOPLE hold
 // positions in it, not that one wallet holds several notes, so the depositor has to be
 // selectable:  node ops/deposit.mjs 640 --as fund
+// `--as` with nothing after it yielded undefined, which is falsy — so the script quietly
+// deposited from the ISSUER wallet instead of the holder the operator meant to name.
 const asLabel = (() => {
   const i = process.argv.indexOf("--as");
-  return i > 0 ? process.argv[i + 1] : null;
+  if (i < 0) return null;
+  const v = process.argv[i + 1];
+  if (v === undefined || v.startsWith("--")) { console.error("--as needs a holder label"); process.exit(1); }
+  return v;
 })();
 const holder = (() => {
   if (!asLabel) return { address: process.env.DEPLOYER_ADDRESS, priv: process.env.DEPLOYER_PK };
@@ -64,7 +69,16 @@ if (!dep.pool || !dep.asset) {
   process.exit(1);
 }
 const dry = process.argv.includes("--dry");
+// argv[2] is positional, so `node ops/deposit.mjs --dry` read "--dry" as the amount. NaN and
+// Infinity throw out of BigInt loudly enough, but 0 and a negative did not: a zero-value
+// note costs a full proving run and a deposit transaction to insert a leaf that takes the
+// circuit's dummy branch on its next spend, and a negative reached `cast` as a uint256
+// argument. Both are operator typos, and neither should get as far as the prover.
 const amountUnits = Number(process.argv[2] ?? 250);
+if (!Number.isFinite(amountUnits) || amountUnits <= 0) {
+  console.error(`usage: node ops/deposit.mjs <amount> [--as <label>] [--dry]   (got ${JSON.stringify(process.argv[2])})`);
+  process.exit(1);
+}
 const amount = BigInt(Math.round(amountUnits * 1e6));      // 6 decimals
 
 const cast = (args) => execFileSync(CAST, args, { encoding: "utf8" }).trim();
@@ -185,7 +199,13 @@ const artifact = {
 // .artifacts is gitignored, so from a clone the directory does not exist and this threw
 // ENOENT after the proving had already been paid for. transfer.mjs creates it; this did not.
 fs.mkdirSync(path.join(ROOT, ".artifacts"), { recursive: true });
-fs.writeFileSync(path.join(ROOT, ".artifacts", "last-deposit.json"), JSON.stringify(artifact, null, 2));
+// One file per deposit, keyed by the commitment it opens. This was a single slot called
+// last-deposit.json, which meant the pre-send copy of the blinding — the only thing standing
+// between a crash after broadcast and a permanently unspendable position — was destroyed by
+// the very next deposit. After a crash the operator's instinct is to run the script again,
+// and that is exactly what erased the recovery data.
+const ARTIFACT = path.join(ROOT, ".artifacts", `deposit-${commitmentHex.slice(2, 18)}.json`);
+writeJson(ARTIFACT, artifact);
 
 if (dry) { console.log("\n--dry: not sending"); process.exit(0); }
 
@@ -224,7 +244,11 @@ if (!succeeded(out)) {
 const txHash = txHashOf(out);
 artifact.depositTx = txHash;
 saveNote(artifact);
-fs.writeFileSync(path.join(ROOT, ".artifacts", "last-deposit.json"), JSON.stringify(artifact, null, 2));
+writeJson(ARTIFACT, artifact);
+// The published index is derived from the ledgers, and a deposit never touched it — only
+// transfer.mjs rewrote it. So evidence.mjs, which counts rows in notes.public.json, reported
+// a register smaller than the one the pool actually held until someone happened to transfer.
+writePublicIndex();
 // A deposit inserts a leaf, and a leaf outside the published note root has no Merkle path —
 // so the position cannot be spent until someone advances the root. transfer.mjs republishes
 // before it spends and therefore self-heals; a deposit does not, so every position entered
@@ -234,7 +258,11 @@ fs.writeFileSync(path.join(ROOT, ".artifacts", "last-deposit.json"), JSON.string
 // move, which is the failure a holder discovers at exactly the wrong moment.
 {
   const { makePoseidon, buildTree } = await import("./merkle.mjs");
-  const wl = JSON.parse(fs.readFileSync(path.join(ROOT, "wallets.json"), "utf8"));
+  // wallets.json is gitignored, so a clone does not have it. Unguarded, this threw ENOENT
+  // AFTER the deposit had landed — leaving the position on chain with no known root
+  // containing its leaf, which is the exact unspendable state this block exists to prevent.
+  const wf = path.join(ROOT, "wallets.json");
+  const wl = fs.existsSync(wf) ? JSON.parse(fs.readFileSync(wf, "utf8")) : [];
   const owner = [...wl].reverse().find((w) => w.label === "issuer" && w.priv)
     ?? { priv: process.env.DEPLOYER_PK };
   const onChain = cast(["call", dep.pool, "allCommitments()(bytes32[])", "--rpc-url", RPC])

@@ -23,17 +23,23 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import * as snarkjs from "snarkjs";
-import { CAST, ROOT, RPC, readDeployment, readOrExit, succeeded, txHashOf } from "./env.mjs";
+import { CAST, ROOT, RPC, readDeployment, readOrExit, succeeded, txHashOf, writeJson } from "./env.mjs";
 import { makePoseidon, buildTree } from "./merkle.mjs";
+import { writePublicIndex } from "./note.mjs";
 
 const LEVELS = 10;
 const FIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 
 const dep = readDeployment();
 const dry = process.argv.includes("--dry");
+// `--as` with nothing after it used to yield undefined, which matched no wallet and fell
+// through to the issuer — so a typo spent the ISSUER's positions and said nothing.
 const asLabel = (() => {
   const i = process.argv.indexOf("--as");
-  return i > 0 ? process.argv[i + 1] : "issuer";
+  if (i < 0) return "issuer";
+  const v = process.argv[i + 1];
+  if (v === undefined || v.startsWith("--")) { console.error("--as needs a holder label"); process.exit(1); }
+  return v;
 })();
 
 const run = (args) => execFileSync(CAST, args, { encoding: "utf8" });
@@ -108,11 +114,24 @@ const total = inNotes.reduce((s, n) => s + n.amount, 0n);
 // sumIn + publicAmount === sumOut over the field. A positive publicAmount is refused by the
 // contract as DepositsUseDepositPath: deposits have their own gated entry and must not be
 // able to arrive through the spend path.
+// A flag with nothing after it read as `undefined`, which every caller below treats as "not
+// passed" — and a flag followed by ANOTHER flag ate it as its value: `--to-label --withdraw
+// 50` set the recipient label to "--withdraw" and still withdrew 50.
 const argOf = (flag, dflt = null) => {
   const i = process.argv.indexOf(flag);
-  return i > 0 ? process.argv[i + 1] : dflt;
+  if (i < 0) return dflt;
+  const v = process.argv[i + 1];
+  if (v === undefined || v.startsWith("--")) { console.error(`${flag} needs a value`); process.exit(1); }
+  return v;
 };
-const toUnits = (v) => BigInt(Math.round(Number(v) * 1e6));
+// An amount the register cannot represent must not reach the circuit. Number("abc") is NaN
+// and Number("1e400") is Infinity; both throw out of BigInt, but a negative does not — it
+// builds a commitment over a field-wrapped amount and only fails at the contract.
+const toUnits = (v) => {
+  const n = Number(v);
+  if (!Number.isFinite(n) || n < 0) { console.error(`not a valid amount: ${v}`); process.exit(1); }
+  return BigInt(Math.round(n * 1e6));
+};
 
 const withdrawUnits = argOf("--withdraw") ? toUnits(argOf("--withdraw")) : 0n;
 // A real recipient. outPubkey is a PRIVATE input to the circuit, so paying someone else
@@ -272,9 +291,13 @@ const fmt2 = (x) => `[[${x[0].join(",")}],[${x[1].join(",")}]]`;
 // writes its artifact first; this file did not.
 const hexOf = (v) => "0x" + v.toString(16).padStart(64, "0");
 fs.mkdirSync(path.join(ROOT, ".artifacts"), { recursive: true });
-fs.writeFileSync(
-  path.join(ROOT, ".artifacts", "last-transfer.json"),
-  JSON.stringify({
+// One file per transfer, not one slot. `last-transfer.json` was overwritten by the next
+// run — so the recovery copy written before the send survived only until the operator did
+// the obvious thing after a crash, which is to run the script again.
+const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+writeJson(
+  path.join(ROOT, ".artifacts", `transfer-${stamp}.json`),
+  {
     spender: spender.address,
     spent: inNotes.map((n) => hexOf(n.commitment)),
     outputs: outs.map((o) => ({
@@ -296,15 +319,56 @@ fs.writeFileSync(
     noteRoot: tree.root.toString(),
     withdraw: withdrawUnits.toString(),
     at: new Date().toISOString(),
-  }, null, 2),
+  },
 );
+
+// The recipient's ledger, also BEFORE the send, and this one is not a nicety.
+//
+// The artifact above deliberately withholds the recipient's blinding — the sender should
+// not keep a disclosure witness for a note they gave away. That left notes.<label>.json,
+// written after the send, as the ONLY place that blinding was ever recorded. Kill the
+// process between the transaction landing and that write and the recipient's commitment is
+// in the tree with no opening anywhere on earth: unspendable, undisclosable, permanent.
+// Written first, `depositTx` is filled in afterwards; a phantom row from a reverted send is
+// recoverable, a lost blinding is not.
+const recipientLedgers = [];
+for (const o of outs.filter((x) => x.to)) {
+  const rf = path.join(ROOT, `notes.${o.to}.json`);
+  const led = fs.existsSync(rf) ? JSON.parse(fs.readFileSync(rf, "utf8")) : { label: o.to, notes: [] };
+  led.notes.push({
+    amount: o.amount.toString(),
+    amountDisplay: Number(o.amount) / 1e6,
+    commitment: hexOf(o.commitment),
+    blinding: o.blinding.toString(),
+    pubKey: o.pubKey.toString(),
+    noteRoot: tree.root.toString(),
+    origin: "received",
+    from: spender.address,
+    receivedAt: new Date().toISOString(),
+    depositTx: null,                 // filled in once the transaction is known to have landed
+  });
+  writeJson(rf, led);
+  recipientLedgers.push({ file: rf, commitment: hexOf(o.commitment), to: o.to });
+}
 
 console.log("\ntransacting…");
 const out = send(spender.priv, [dep.pool,
   "transact(uint256[2],uint256[2][2],uint256[2],uint256[7],address,address,uint256)",
   fmt(pA), fmt2(pB), fmt(pC), fmt(pub), recipient, relayer, fee.toString()]);
 console.log(out.split("\n").filter((l) => /^(status|transactionHash|gasUsed|blockNumber)/.test(l)).join("\n"));
-if (!succeeded(out)) throw new Error("transact reverted — nothing recorded");
+if (!succeeded(out)) {
+  // The recipient rows were written before the send, deliberately. A REVERT is the one case
+  // where we know for certain the commitment is not in the tree, so the pending row can be
+  // taken back out — otherwise writePublicIndex would later publish a position the register
+  // does not hold. A crash instead of a revert leaves the row, which is the safe direction:
+  // a phantom row is visible and fixable, a lost blinding is neither.
+  for (const { file, commitment } of recipientLedgers) {
+    const led = JSON.parse(fs.readFileSync(file, "utf8"));
+    led.notes = led.notes.filter((n) => !(n.commitment === commitment && !n.depositTx));
+    writeJson(file, led);
+  }
+  throw new Error("transact reverted — nothing recorded");
+}
 
 const txHash = txHashOf(out);
 
@@ -316,44 +380,22 @@ const txHash = txHashOf(out);
 const TRANSFERS = path.join(ROOT, "transfers.json");
 const transfers = fs.existsSync(TRANSFERS) ? JSON.parse(fs.readFileSync(TRANSFERS, "utf8")) : [];
 if (txHash && !transfers.includes(txHash)) transfers.push(txHash);
-fs.writeFileSync(TRANSFERS, JSON.stringify(transfers, null, 2) + "\n");
+writeJson(TRANSFERS, transfers);
+
+// The recipient's note is already on disk; name the transaction that carried it.
+for (const { file, commitment, to } of recipientLedgers) {
+  const led = JSON.parse(fs.readFileSync(file, "utf8"));
+  for (const n of led.notes) if (n.commitment === commitment && !n.depositTx) n.depositTx = txHash;
+  writeJson(file, led);
+  console.log(`\n${to} received a position, and only ${to} can spend it — this`);
+  console.log(`process never held the key. Written to notes.${to}.json`);
+}
 
 // The spent notes are gone and the new ones are the register's; record them so the next
 // aggregate proof enumerates what the pool actually holds.
 const kept = notes.filter((n) => !ins.some((i) => i.commitment === n.commitment));
-// Positions this process cannot open but the register still holds. They belong in the
-// public index — a commitment is public, and leaving them out understates the register.
-const publicExtra = [];
 for (const o of outs) {
-  // A note whose key this process does not hold is not ours to record as a position. It is
-  // written to the recipient's own ledger, without a privKey, because there isn't one here.
-  if (o.to) {
-    const rf = path.join(ROOT, `notes.${o.to}.json`);
-    const led = fs.existsSync(rf) ? JSON.parse(fs.readFileSync(rf, "utf8")) : { label: o.to, notes: [] };
-    led.notes.push({
-      amount: o.amount.toString(),
-      amountDisplay: Number(o.amount) / 1e6,
-      commitment: hexOf(o.commitment),
-      blinding: o.blinding.toString(),
-      pubKey: o.pubKey.toString(),
-      noteRoot: tree.root.toString(),
-      origin: "received",
-      from: spender.address,
-      receivedAt: new Date().toISOString(),
-      depositTx: txHash,
-    });
-    fs.writeFileSync(rf, JSON.stringify(led, null, 2) + "\n");
-    publicExtra.push({
-      commitment: hexOf(o.commitment),
-      depositTx: txHash,
-      provedAt: new Date().toISOString(),
-      aspRoot: null,                 // a transact carries no association-set proof
-      origin: "received",
-    });
-    console.log(`\n${o.to} received a position, and only ${o.to} can spend it — this`);
-    console.log(`process never held the key. Written to notes.${o.to}.json`);
-    continue;
-  }
+  if (o.to) continue;              // already written to the recipient's own ledger, above
   kept.push({
     wallet: spender.address,
     amount: o.amount.toString(),
@@ -369,14 +411,12 @@ for (const o of outs) {
     depositTx: txHash,
   });
 }
-fs.writeFileSync(path.join(ROOT, "notes.json"), JSON.stringify(kept, null, 2) + "\n");
-fs.writeFileSync(
-  path.join(ROOT, "notes.public.json"),
-  JSON.stringify(
-    kept.map(({ commitment, depositTx, provedAt, aspRoot, origin }) =>
-      ({ commitment, depositTx, provedAt, aspRoot, origin })).concat(publicExtra),
-    null, 2) + "\n",
-);
+writeJson(path.join(ROOT, "notes.json"), kept);
+// Derive the index from every ledger on disk rather than from this transfer's own view.
+// Rebuilding it from `kept` plus THIS transfer's recipients dropped every earlier
+// recipient: a second transfer to a second holder published an index that had quietly
+// forgotten the first one's position, and evidence.mjs counts rows in this file.
+writePublicIndex();
 
 // Publish the root that contains the leaves this transfer just inserted. Without it the
 // new positions — including one paid to someone else — have no Merkle path into any known

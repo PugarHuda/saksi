@@ -29,7 +29,7 @@ import "./env.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { client } from "./cleanverse.mjs";
-import { ROOT, RPC, CHAIN, readAsp, readDeployment } from "./env.mjs";
+import { ROOT, RPC, CHAIN, readAsp, readDeployment, writeJson } from "./env.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -228,10 +228,9 @@ console.log(
   `watching a single transfer identifies the position and its size.`,
 );
 
-fs.writeFileSync(
+writeJson(
   path.join(ROOT, "measurement.json"),
-  JSON.stringify(
-    {
+  {
       chain: CHAIN,
       headBlock: head,
       measuredAt: new Date().toISOString(),
@@ -250,9 +249,7 @@ fs.writeFileSync(
       assetsUnderFiveHolders: underFive,
       assetsWithDominantHolder: dominated,
       assets: rows,
-    },
-    null, 2,
-  ) + "\n",
+  },
 );
 console.log("\nwritten to measurement.json");
 process.exit(0);

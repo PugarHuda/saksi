@@ -76,8 +76,20 @@ export default function EvidenceView({
   const closed = (rows ?? audit.map(blank)).filter((r) => r.verified);
   // The chain's own account of how many requests are still open. If it disagrees with the
   // file, the file is what is wrong — say so rather than quietly showing the file's number.
-  const openOnChain = rows?.filter((r) => r.answered === 0).length ?? null;
-  const fileDisagrees = openOnChain !== null && rows !== null && openOnChain !== open.length;
+  //
+  // Only when EVERY row was actually read. Each read above is individually caught to null so
+  // one failure does not blank the tab, which meant a throttled RPC left every `answered` at
+  // null, none of them equal to 0, and the count came out 0 — against a bundle listing two
+  // open requests. The tab then opened with a red alert saying the contract reports 0 still
+  // open and to trust the contract, while each request below it said `could not read the
+  // contract`. The contract had said nothing. This tab exists to show two questions have gone
+  // unanswered; a flaky network made the page itself assert they had been answered, which is
+  // the worst sentence it could possibly produce. There is no true-positive path today — on
+  // chain the count is exactly 2, matching the file — so every render of that banner was a
+  // failed read wearing a verdict's clothes.
+  const readEveryRow = rows !== null && rows.every((r) => r.answered !== null);
+  const openOnChain = readEveryRow ? rows.filter((r) => r.answered === 0).length : null;
+  const fileDisagrees = openOnChain !== null && openOnChain !== open.length;
 
   return (
     <div className="grid">

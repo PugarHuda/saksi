@@ -1,6 +1,6 @@
 "use client";
 
-import { short, units } from "@/lib/chain";
+import { isoMinute, short, units } from "@/lib/chain";
 import type { Deployment, Measurement, Position } from "@/lib/types";
 import type { useLive } from "@/lib/useLive";
 import { Addr, Badge, Empty, ErrorBox, Redacted, Skeleton, Tx } from "./bits";
@@ -202,7 +202,7 @@ export default function RegisterView({
                         )}
                       </td>
                       <td className="mono" style={{ fontSize: "var(--t-xs)" }}>
-                        {new Date(p.provedAt).toISOString().replace("T", " ").slice(0, 16)}
+                        {isoMinute(p.provedAt)}
                       </td>
                       <td>
                         <Tx hash={p.depositTx} label={moved ? "transfer tx" : undefined} />

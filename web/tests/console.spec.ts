@@ -123,6 +123,61 @@ test("the evidence tab shows an open request the chain confirms is open", async 
   await expect(page.getByText(/^\+\d+$/).first()).toBeVisible();
 });
 
+/** An unreachable chain must never be rendered as an answer from the chain.
+ *
+ *  Each evidence read is caught to null individually so one failure does not blank the tab.
+ *  That left a throttled RPC with every `answered` at null, none equal to 0, and a count of
+ *  zero open requests — against a bundle listing two. The tab opened with a red alert saying
+ *  the contract reports 0 still open and to trust the contract, above rows each admitting
+ *  they could not read the contract. On chain the count is exactly 2 and always has been, so
+ *  that banner had no true-positive path: every appearance was a failed read wearing a
+ *  verdict's clothes, on the one tab whose entire job is to show two questions have gone
+ *  unanswered. */
+test("a dead RPC is reported as a dead RPC, not as a verdict", async ({ page }) => {
+  await page.route("**/testnet-rpc.monad.xyz/**", (r) => r.abort());
+  await page.goto("/console");
+  await expect(page.getByRole("tab", { name: "Evidence" })).toHaveAttribute("aria-selected", "true");
+  // The accusation must be absent — not merely different, absent.
+  await expect(page.getByText(/the contract reports \d+ still open/)).toHaveCount(0);
+  await expect(page.getByText(/Trust the contract/)).toHaveCount(0);
+  // And the tab still says the two requests are open, which is what the bundle claims and
+  // what the chain would confirm if it could be reached.
+  await expect(page.getByText("no proof exists — the request stays open").first()).toBeVisible();
+});
+
+/** A credential lookup that FAILED must not be rendered as a credential that is ABSENT.
+ *
+ *  The route can answer with a gateway's HTML. `r.json()` threw on it, the whole Promise.all
+ *  rejected, and the card — which reads a null lookup as "not found" — printed the badge
+ *  "No credential on this chain" about a wallet whose credential had never been checked. On
+ *  the tab an issuer would use to decide whether someone may hold the asset. */
+test("a failed credential lookup is not rendered as a missing credential", async ({ page }) => {
+  await page.route("**/api/apass*", (r) =>
+    r.fulfill({ status: 504, contentType: "text/html", body: "<html>gateway timeout</html>" }),
+  );
+  await page.goto("/console");
+  await page.getByRole("tab", { name: "Issuer" }).click();
+  await page.getByRole("button", { name: "Use the issuer wallet" }).click();
+  await expect(page.getByText(/credential lookup failed \(HTTP 504\)/)).toBeVisible({ timeout: 40000 });
+  await expect(page.getByText("No credential on this chain")).toHaveCount(0);
+});
+
+/** One missing field in a credential answer used to unmount the entire console.
+ *
+ *  `new Date(undefined).toISOString()` throws RangeError, React has no boundary on this tree,
+ *  and every tab went to "This page couldn't load" — from an expiry date. */
+test("a credential answer missing its fields does not take the console down", async ({ page }) => {
+  const errs: string[] = [];
+  page.on("pageerror", (e) => errs.push(e.message));
+  await page.route("**/api/apass*", (r) => r.fulfill({ json: { found: true, countries: [] } }));
+  await page.goto("/console");
+  await page.getByRole("tab", { name: "Issuer" }).click();
+  await page.getByRole("button", { name: "Use the issuer wallet" }).click();
+  await expect(page.getByRole("tab", { name: "Issuer" })).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByText("This page couldn’t load")).toHaveCount(0);
+  expect(errs).toEqual([]);
+});
+
 /** Phone, tablet, laptop. Every sideways-scroll defect this project has had came from one
  *  child's min-content width — a hash, a cast command, a badge label — escaping its grid
  *  track, and each was invisible at the width above it. */

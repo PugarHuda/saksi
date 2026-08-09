@@ -10,7 +10,7 @@
 import "./env.mjs";
 import fs from "node:fs";
 import path from "node:path";
-import { ROOT } from "./env.mjs";
+import { ROOT, writeJson } from "./env.mjs";
 import { noteTools, randomField } from "./note.mjs";
 
 // A label becomes a filename, so it is a path fragment with no validation between it and
@@ -37,7 +37,7 @@ const privKey = randomField();
 const pubKey = t.pubKey(privKey);
 
 // The ledger starts with the key and no positions. saveNote appends to it as notes arrive.
-fs.writeFileSync(file, JSON.stringify({ label, privKey: privKey.toString(), pubKey: pubKey.toString(), notes: [] }, null, 2) + "\n");
+writeJson(file, { label, privKey: privKey.toString(), pubKey: pubKey.toString(), notes: [] });
 
 console.log(`${label} generated their own spending key.`);
 console.log(`  ledger   notes.${label}.json   (gitignored — it holds the key)`);

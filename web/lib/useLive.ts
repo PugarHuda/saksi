@@ -91,9 +91,44 @@ export function useEligibility(pool: string | undefined) {
       try {
         // Both answers at once, because they are different questions. The chain says
         // whether this pool will admit the wallet; the registry says why.
+        //
+        // A failed lookup is not an absent credential. This route can answer with a gateway's
+        // HTML — a 504 from a proxy, a captive portal — and `r.json()` throws on it, which
+        // rejected the whole Promise.all and left `apass` at null. The credential card reads
+        // null as "not found" and printed the badge "No credential on this chain" about a
+        // wallet whose credential was never checked, alongside a verdict for a wallet the
+        // chain had answered for. A false negative stated as a fact is the worst thing this
+        // console can do, so a failure resolves to `{ error }` — the shape the card already
+        // renders as an error — rather than to nothing.
         const [onChain, apass] = await Promise.all([
           readBool(pool, SELECTORS.isEligible, address).catch(() => null),
-          fetch(`/api/apass?address=${address}`).then((r) => r.json() as Promise<ApassLookup>),
+          fetch(`/api/apass?address=${address}`)
+            .then(async (r): Promise<ApassLookup> => {
+              const text = await r.text();
+              let body: unknown;
+              try {
+                body = JSON.parse(text);
+              } catch {
+                return {
+                  error: r.ok
+                    ? "The credential lookup answered with something that is not JSON."
+                    : `The credential lookup failed (HTTP ${r.status}) — this wallet's credential was NOT checked.`,
+                };
+              }
+              if (!r.ok) {
+                const msg = (body as { message?: string })?.message;
+                return { error: `The credential lookup failed (HTTP ${r.status})${msg ? ` — ${msg}` : ""}.` };
+              }
+              // A 200 whose body answers neither question is also not a "no".
+              const b = body as Record<string, unknown>;
+              if (typeof b?.found !== "boolean" && typeof b?.error !== "string") {
+                return { error: "The credential lookup answered without saying whether a credential exists." };
+              }
+              return body as ApassLookup;
+            })
+            .catch((e: Error) => ({
+              error: `The credential lookup could not be reached — ${e.message}`,
+            })),
         ]);
         setResult({ address, onChain, apass });
       } catch (e) {

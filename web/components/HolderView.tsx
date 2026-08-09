@@ -100,7 +100,14 @@ export default function HolderView({
     }
   }, [run]);
 
-  const admitted = result && result.gate1 === true && result.gate2 && !result.denied;
+  // Three states, not two. `gate1` is null when the Validator could not be read, and the
+  // table cell below already renders that as "no answer" — but the headline collapsed null
+  // into false and announced THIS WALLET CANNOT ENTER · REFUSED, in the largest type on the
+  // page, about a wallet that is in fact admitted, directly above a row admitting it had no
+  // answer. The one sentence this tab exists to produce, and a transient read failure was
+  // enough to make it say the opposite. GatesView already models the same case correctly.
+  const unknown = result !== null && result.gate1 === null;
+  const admitted = result !== null && result.gate1 === true && result.gate2 && !result.denied;
 
   return (
     <div className="grid">
@@ -173,8 +180,14 @@ export default function HolderView({
         <>
           <section className="card">
             <h2>
-              {admitted ? "This wallet can enter" : "This wallet cannot enter"}{" "}
-              <Badge tone={admitted ? "ok" : "no"}>{admitted ? "admitted" : "refused"}</Badge>
+              {unknown
+                ? "This wallet could not be checked"
+                : admitted
+                  ? "This wallet can enter"
+                  : "This wallet cannot enter"}{" "}
+              <Badge tone={unknown ? "warn" : admitted ? "ok" : "no"}>
+                {unknown ? "no answer" : admitted ? "admitted" : "refused"}
+              </Badge>
             </h2>
             <p className="note">
               <Addr value={result.address} /> — three independent conditions, all of which
