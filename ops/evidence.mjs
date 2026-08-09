@@ -71,10 +71,19 @@ const IS_REG = "0xc3c5a547";
 line(`validator.isRegistered(pool)`.padEnd(46) +
   (BigInt(await call(dep.validator, IS_REG + pad(dep.pool))) === 1n ? "true" : "false"));
 
+// The negative control has to be a wallet Cleanverse genuinely refuses. 0x…dEaD is not
+// one: somebody in the shared sandbox issued the burn address an active tier-50 A-Pass,
+// so complianceVerify ADMITS it and printing it under a "refused" heading was a false row
+// in a judged artefact. This address holds no credential at all.
+const NO_CREDENTIAL = "0xe69B129724007C56A0BAcCDe1dAa7Aa2646D16b5";
+
 for (const [who, addr] of [
   ["issuer", dep.issuer],
+  ["a wallet with no A-Pass", NO_CREDENTIAL],
   ["burn address 0x…dEaD", "0x000000000000000000000000000000000000dEaD"],
-  ...(asp.dropped ?? []).map((d) => [`revoked ${d.label ?? d.wallet.slice(0, 8)}`, d.wallet]),
+  ...(asp.dropped ?? [])
+    .filter((d) => d.wallet)
+    .map((d) => [`revoked ${d.label ?? d.wallet.slice(0, 8)}`, d.wallet]),
 ]) {
   const v = await call(dep.validator, CV + pad(dep.pool) + pad(addr));
   line(`validator.complianceVerify(pool, ${who})`.padEnd(46) + (BigInt(v) === 1n ? "true" : "false"));

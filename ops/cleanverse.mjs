@@ -107,6 +107,27 @@ export class Cleanverse {
 
   queryDepositAddress(chain, address) { return this.post("query_deposit_address", { chain, address }); }
 
+  /** The token-level gate: may `address` receive or transfer `atoken` under the rules the
+   *  A-Token itself carries? That is a different question from `validator/verify`, which
+   *  asks about a pool's rules — different contract, different rule set.
+   *
+   *  The four documented outcomes do not all arrive by the same route. 1 (A-Token not
+   *  found), 2 (no A-Pass) and 4 (allowed) come back as HTTP 200 / code 0000 with the
+   *  verdict in `data.code`. A frozen or expired A-Pass — documented as 3 — does NOT: the
+   *  gateway answers code 0002 and puts the on-chain custom error in `message`, so a
+   *  client that only reads `data.code` throws where it should have returned a verdict.
+   *  Verified against the sandbox on 2026-08-09. This normalises all four into the
+   *  documented shape, and still throws for failures that are not verdicts. */
+  async verifyApass(chain, atoken, address) {
+    try {
+      return await this.post("verify_apass", { chain, atoken, address });
+    } catch (e) {
+      const code = apassVerdictCode(e.body?.message ?? e.message);
+      if (code === null) throw e;
+      return { chain, atoken, address, code, message: e.body?.message ?? e.message };
+    }
+  }
+
   /** status 1 = Activate, 2 = Freeze. */
   static isActive(rec) {
     return rec?.status === 1 && Number(rec.expirationTime) * 1000 > Date.now();
@@ -174,7 +195,31 @@ export class Cleanverse {
     return this.post("atoken/add_rule", { chain, atoken_address, rule });
   }
 
+  atokenIsPaused(chain, atoken_address) {
+    return this.post("atoken/is_paused", { chain, atoken_address });
+  }
+
+  /** WRITE. Halts every transfer of the A-Token. Nothing in the repo calls this — it is
+   *  here so the kill switch is one call away, not so it runs. `ops/cva-gate.mjs` keeps
+   *  it behind an explicit flag. */
+  setAtokenPaused(chain, atoken_address, paused) {
+    return this.post("atoken/set_paused", { chain, atoken_address, paused });
+  }
+
   applyStatus(requestId) { return this.get(`atoken/query_apply_status/${requestId}`); }
+
+  // ---- Indexed transaction history -------------------------------------
+
+  /** `symbol` is documented optional and is not: omitting it, or passing a symbol the
+   *  indexer does not know, returns `[0002] invalid symbol`. Only Cleanverse's own
+   *  catalogue is indexed (`ausdc`, `usdc`, …) — a self-issued A-Token's symbol is
+   *  rejected, so this cannot see SAKSIAZEV transfers. Verified 2026-08-09. */
+  queryTxs(params) { return this.post("query_txs", params); }
+
+  /** Deposits/withdrawals between a licensed institution and a user. `type` is required
+   *  and is "deposit" or "withdraw". Returns null data when the caller is not the
+   *  institution on record. */
+  queryInstitutionTxs(params) { return this.post("query_institution_txs", params); }
 
   listMyAtokens(params = {}) { return this.get("atoken/list_my_atokens", params); }
 
@@ -184,6 +229,24 @@ export class Cleanverse {
 
   /** Returns { downloadUrl, fileName } for a real Travel Rule PDF. */
   downloadTravelRule(params) { return this.post("download_travel_rule", params); }
+}
+
+/** The verdict codes `verify_apass` returns in `data.code`. */
+export const APASS_VERDICT = {
+  1: "A-Token not found",
+  2: "no A-Pass",
+  3: "A-Pass frozen or expired",
+  4: "allowed",
+};
+
+/** Recover the documented verdict from a gateway error message, for the outcomes the
+ *  gateway reports as a 0002 instead of a `data.code`. Returns null when the message is
+ *  not a verdict at all — a genuine failure must stay a failure. */
+export function apassVerdictCode(message = "") {
+  if (/APassNotActive/i.test(message)) return 3;
+  if (/apass not (exist|found)|APassNotExist/i.test(message)) return 2;
+  if (/atoken not exist/i.test(message)) return 1;
+  return null;
 }
 
 /**

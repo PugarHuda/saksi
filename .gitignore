@@ -39,3 +39,7 @@ web/tsconfig.tsbuildinfo
 # The console ships a REDACTED copy of the set and must be able to track it. The bare
 # `asp.json` rule above is what keeps the raw build out; this one path is the public build.
 !web/public/data/asp.json
+
+# Next 16 writes these into the tree on `npm run dev`.
+web/AGENTS.md
+web/CLAUDE.md

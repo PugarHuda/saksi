@@ -1,6 +1,7 @@
 // Live sandbox smoke test. Read-only: nothing here writes on-chain.
 //   CV_API_ID=... CV_API_KEY=... node scripts/smoke.mjs
 
+import "./env.mjs";
 import { Cleanverse, rule } from "./cleanverse.mjs";
 
 const cv = new Cleanverse();

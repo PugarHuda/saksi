@@ -20,47 +20,109 @@ export default function Landing() {
   // answers it, this section disappears instead of quietly becoming a lie.
   const unanswered = audit.find((a) => !a.verified);
 
+  // The visual is not decoration and not stock art: it is the register's own commitments,
+  // tiled into a field. This is what the chain actually shows an observer — the positions
+  // are there, they are counted, and not one of them is readable.
+  const cipher = (() => {
+    const src = positions.map((p) => p.commitment.replace(/^0x/, "")).join("");
+    if (!src) return "";
+    const COLS = 46;
+    const ROWS = 26;
+    const rows: string[] = [];
+    for (let r = 0; r < ROWS; r++) {
+      let line = "";
+      for (let c = 0; c < COLS; c++) {
+        const i = (r * COLS + c) % src.length;
+        // Thin it towards the edges so the field reads as a mass rather than a wall.
+        const dx = (c - COLS / 2) / (COLS / 2);
+        const dy = (r - ROWS / 2) / (ROWS / 2);
+        const edge = Math.sqrt(dx * dx + dy * dy);
+        line += edge > 0.92 ? " " : edge > 0.66 && (i % 3 === 0) ? " " : src[i];
+      }
+      rows.push(line);
+    }
+    return rows.join("\n");
+  })();
+
   return (
     <div className="land">
-      <header className="land-nav">
-        <Link href="/" className="wordmark" aria-label="Saksi, home">
-          <SaksiMark />
-          <strong>Saksi</strong>
-        </Link>
-        <nav aria-label="Primary">
-          <a href="https://github.com/PugarHuda/saksi" target="_blank" rel="noreferrer">
-            Source
-          </a>
-          <Link href="/console" className="btn">
-            Open the console
-          </Link>
-        </nav>
-      </header>
+      <section className="split">
+        {/* LEFT — the claim, on a clean ground. */}
+        <div className="split-panel">
+          <div className="split-head">
+            <Link href="/" className="wordmark" aria-label="Saksi, home">
+              <SaksiMark />
+              <strong>Saksi</strong>
+            </Link>
+            <span className="split-chain mono">monad · 10143</span>
+          </div>
+
+          <div className="split-body">
+            <span className="dots" aria-hidden="true">
+              <i /><i /><i />
+            </span>
+            <h1 className="display">
+              THE REGISTER
+              <br />
+              <em>that keeps</em>
+              <br />
+              ITS POSITIONS
+            </h1>
+            <p className="display-sub">
+              A confidential holder register for tokenized real-world assets. Entry is gated
+              by Cleanverse, the middle is shielded, and a regulator still gets an answer.
+            </p>
+            <Link href="/console" className="btn slab">
+              CHECK A WALLET
+            </Link>
+          </div>
+
+          <div className="split-foot">
+            <span className="strip-label">BUILT ON</span>
+            <ul className="strip" role="list">
+              <li>Cleanverse CVI</li>
+              <li>CVA</li>
+              <li>Monad</li>
+              <li>Groth16</li>
+              <li>Circom</li>
+            </ul>
+          </div>
+        </div>
+
+        {/* RIGHT — the register itself, rendered as what an observer actually sees. */}
+        <div className="split-visual">
+          <nav className="visual-nav" aria-label="Primary">
+            <Link href="/console">Console</Link>
+            <a href="https://github.com/PugarHuda/saksi#readme" target="_blank" rel="noreferrer">
+              How it works
+            </a>
+            <a href="https://github.com/PugarHuda/saksi" target="_blank" rel="noreferrer">
+              Source
+            </a>
+          </nav>
+
+          <pre className="cipher mono" aria-hidden="true">{cipher}</pre>
+          <p className="sr-only">
+            A field of the register&rsquo;s own commitment hashes, unreadable by design.
+          </p>
+
+          {unanswered && (
+            <aside className="visual-card">
+              <span className="dots gold" aria-hidden="true">
+                <i /><i /><i />
+              </span>
+              <h2>A QUESTION WITH NO ANSWER</h2>
+              <p>
+                The auditor asked it on-chain. No proof exists, so it stays open — permanently,
+                and in public.
+              </p>
+              <p className="mono card-q">&ldquo;{unanswered.question}&rdquo;</p>
+            </aside>
+          )}
+        </div>
+      </section>
 
       <main>
-        <section className="hero">
-          <p className="eyebrow">Cleanverse CVI + CVA · Monad testnet</p>
-          <h1>
-            A holder register that keeps its positions private
-            <br />
-            and still answers to a regulator.
-          </h1>
-          <p className="lede">
-            Tokenized real-world assets publish their holder register in the clear. Saksi
-            shields every position behind a commitment, gates entry on a live Cleanverse
-            credential <em>and</em> a zero-knowledge membership proof, and answers audit
-            questions with proofs instead of spreadsheets.
-          </p>
-          <p className="cta">
-            <Link href="/console" className="btn primary">
-              Open the console
-            </Link>
-            <a className="btn ghost" href="https://github.com/PugarHuda/saksi#readme" target="_blank" rel="noreferrer">
-              Read how it works
-            </a>
-          </p>
-        </section>
-
         {m && (
           <section className="band" aria-labelledby="measured">
             <h2 id="measured">The problem, measured</h2>

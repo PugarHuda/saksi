@@ -42,7 +42,7 @@ const CAST = fs.existsSync(path.join(process.env.USERPROFILE ?? "", ".foundry", 
 const run = (args) => execFileSync(CAST, args, { encoding: "utf8" });
 const call = (to, sig, ...a) => run(["call", to, sig, ...a, "--rpc-url", RPC]).trim();
 const send = (pk, args) =>
-  run(["send", ...args, "--rpc-url", RPC, "--chain", "10143", "--gas-limit", "3600000",
+  run(["send", ...args, "--rpc-url", RPC, "--chain", "10143", "--gas-limit", "5000000",
        "--private-key", pk]);
 
 const wallets = JSON.parse(fs.readFileSync(path.join(ROOT, "wallets.json"), "utf8"));
@@ -90,10 +90,47 @@ const inNotes = ins.map((n) => ({
 }));
 
 const total = inNotes.reduce((s, n) => s + n.amount, 0n);
-// A re-split, not a round number: two outputs that do not match either input means the
-// amounts cannot be recovered by inspection even by someone who watched both deposits.
-const outA = (total * 37n) / 100n;
-const outB = total - outA;
+
+// Leaving the register is the other half, and it is the edge Cleanverse is most opinionated
+// about: every address that receives a CVA needs a credential. So `transact` calls
+// complianceVerify on their validator for the RECIPIENT, and again for the RELAYER if a fee
+// is paid — two live compliance checks that exist only on this path.
+//
+//   node ops/transfer.mjs --as issuer --withdraw 50 --to 0x… --relayer 0x… --fee 0.5
+//
+// A withdrawal of x is encoded as publicAmount = FIELD - x, because the circuit constrains
+// sumIn + publicAmount === sumOut over the field. A positive publicAmount is refused by the
+// contract as DepositsUseDepositPath: deposits have their own gated entry and must not be
+// able to arrive through the spend path.
+const argOf = (flag, dflt = null) => {
+  const i = process.argv.indexOf(flag);
+  return i > 0 ? process.argv[i + 1] : dflt;
+};
+const toUnits = (v) => BigInt(Math.round(Number(v) * 1e6));
+
+const withdrawUnits = argOf("--withdraw") ? toUnits(argOf("--withdraw")) : 0n;
+const recipient = argOf("--to", "0x0000000000000000000000000000000000000000");
+const relayer = argOf("--relayer", "0x0000000000000000000000000000000000000000");
+const fee = argOf("--fee") ? toUnits(argOf("--fee")) : 0n;
+
+if (withdrawUnits > total) {
+  console.error(`cannot withdraw ${Number(withdrawUnits) / 1e6} from notes worth ${Number(total) / 1e6}`);
+  process.exit(1);
+}
+if (withdrawUnits === 0n && fee !== 0n) {
+  console.error("a fee is only payable out of a withdrawal — the contract refuses it otherwise");
+  process.exit(1);
+}
+if (fee > withdrawUnits) {
+  console.error("the relayer's fee cannot exceed the withdrawal it is paid from");
+  process.exit(1);
+}
+
+// A re-split, not a round number: two outputs that match neither input means the amounts
+// cannot be recovered by inspection even by someone who watched both deposits.
+const remaining = total - withdrawUnits;
+const outA = (remaining * 37n) / 100n;
+const outB = remaining - outA;
 
 // Fresh keys for the outputs. The whole point is that the new notes are not linkable to
 // the old ones, so they must not reuse the spending key.
@@ -111,21 +148,17 @@ const outs = [
   return { ...o, pubKey, commitment: h3(o.amount, pubKey, o.blinding) };
 });
 
-// Pure internal transfer: publicAmount 0, nothing leaves the register, no recipient and no
-// fee. The withdrawal path is gated on the recipient's credential and is a separate story.
-const recipient = "0x0000000000000000000000000000000000000000";
-const relayer = "0x0000000000000000000000000000000000000000";
-const fee = 0n;
 // cast prints a decimal followed by a human-readable exponent — "1234… [1.2e75]" — so the
 // annotation has to come off before this is a number.
 const extDataHash = BigInt(
-  call(dep.pool, "extDataHashOf(address,address,uint256)(uint256)", recipient, relayer, "0")
+  call(dep.pool, "extDataHashOf(address,address,uint256)(uint256)",
+       recipient, relayer, fee.toString())
     .split(/\s+/)[0],
 );
 
 const input = {
   root: tree.root.toString(),
-  publicAmount: "0",
+  publicAmount: (withdrawUnits === 0n ? 0n : FIELD - withdrawUnits).toString(),
   extDataHash: extDataHash.toString(),
   inputNullifier: inNotes.map((n) => h3(n.commitment, BigInt(n.index), n.privKey).toString()),
   outputCommitment: outs.map((o) => o.commitment.toString()),
@@ -141,7 +174,11 @@ const input = {
 
 console.log(`\nspending ${asLabel}'s notes at leaves ${inNotes.map((n) => n.index).join(" and ")}`);
 console.log(`  in   ${inNotes.map((n) => Number(n.amount) / 1e6).join(" + ")} = ${Number(total) / 1e6}`);
-console.log(`  out  ${outs.map((o) => Number(o.amount) / 1e6).join(" + ")} = ${Number(total) / 1e6}  (never published)`);
+console.log(`  out  ${outs.map((o) => Number(o.amount) / 1e6).join(" + ")} = ${Number(remaining) / 1e6}  (never published)`);
+if (withdrawUnits) {
+  console.log(`  exit ${Number(withdrawUnits) / 1e6} to ${recipient}` + (fee ? `, of which ${Number(fee) / 1e6} to the relayer ${relayer}` : ""));
+  console.log("       the contract checks both against Cleanverse's validator");
+}
 
 const t0 = Date.now();
 const { proof, publicSignals } = await snarkjs.groth16.fullProve(
@@ -159,7 +196,8 @@ console.log(`\ntransfer proof   proved and verified in ${Date.now() - t0} ms`);
 const cd = JSON.parse("[" + await snarkjs.groth16.exportSolidityCallData(proof, publicSignals) + "]");
 const [pA, pB, pC, pub] = cd;
 
-if (BigInt(pub[1]) !== 0n) throw new Error("publicAmount must be 0 for an internal transfer");
+const expectedPublic = withdrawUnits === 0n ? 0n : FIELD - withdrawUnits;
+if (BigInt(pub[1]) !== expectedPublic) throw new Error("publicAmount disagrees with the withdrawal");
 if (BigInt(pub[2]) !== extDataHash) throw new Error("extDataHash disagrees with the pool");
 
 if (dry) {
@@ -182,7 +220,7 @@ const fmt2 = (x) => `[[${x[0].join(",")}],[${x[1].join(",")}]]`;
 console.log("\ntransacting…");
 const out = send(spender.priv, [dep.pool,
   "transact(uint256[2],uint256[2][2],uint256[2],uint256[7],address,address,uint256)",
-  fmt(pA), fmt2(pB), fmt(pC), fmt(pub), recipient, relayer, "0"]);
+  fmt(pA), fmt2(pB), fmt(pC), fmt(pub), recipient, relayer, fee.toString()]);
 console.log(out.split("\n").filter((l) => /^(status|transactionHash|gasUsed|blockNumber)/.test(l)).join("\n"));
 if (!/^status\s+1/m.test(out)) throw new Error("transact reverted — nothing recorded");
 

@@ -10,7 +10,7 @@ Pool `0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA` · CVA `SAKSIAZEV` · chain `1
 ## Cold open — 40 seconds, terminal only
 
 ```bash
-node ops/measure-register.mjs --report
+node ops/measure-register.mjs
 ```
 
 > "Every tokenized-RWA platform publishes its holder register in the clear, and the answer
@@ -34,7 +34,7 @@ Point at three numbers.
 ## Beat 1 — the question comes before the answer · 90 seconds
 
 ```bash
-node ops/audit.mjs list
+node ops/evidence.mjs
 ```
 
 > "A regulator posts a question on-chain. Then, and only then, the holder produces a proof
@@ -120,11 +120,14 @@ Show the transfer transaction `0x30a74be85a99b68c4bd0a40a1beb7575b0b06686ed61099
 
 > "This is a JoinSplit. Two of the issuer's positions — 250 and 480, both public from their
 > deposits — were spent, and two new positions were created. What is on-chain is two
-> nullifiers and two commitments. The new amounts are **270.1 and 459.9**, and you cannot
-> read either of those anywhere on this chain. Nothing links an input to an output."
+> nullifiers and two commitments. Nothing links an input to an output."
 
-> "The register still backs 1,680 units and still holds six commitments. Four of them are
-> live positions. Which four is not public."
+> "One of the new amounts is 459.9, and you can read it — at block 52210355, because the
+> auditor asked for it ten blocks earlier. That is the point. It was unreadable until a
+> regulator posted a question, and the chain records that the question came first."
+
+> "The register still backs every unit it held and the total is unchanged by this. Four of
+> its commitments are live positions, and which four is not public."
 
 ---
 
@@ -153,7 +156,7 @@ node ops/asp.mjs build
 cd contracts && forge test
 ```
 
-> "Sixty-four tests, including the exploit proofs from an adversarial review of this
+> "Eighty-seven tests, including the exploit proofs from an adversarial review of this
 > codebase — kept as regression tests, and three of them assert limitations that are still
 > open."
 

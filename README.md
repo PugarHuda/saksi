@@ -135,7 +135,7 @@ cast call 0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA "activeRules()((bytes2,byte
 cast call 0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA "isEligible(address)(bool)" 0x4490CcB0abdE3D2E494dE5cC118F7D0D74b44639 --rpc-url https://testnet-rpc.monad.xyz
 ```
 
-## Four demonstrations
+## Five demonstrations
 
 **1. The question comes first.** Four disclosure types, all verified on-chain, in
 [`audit-log.json`](audit-log.json). Every request block precedes its answer block — 52210266
@@ -171,9 +171,14 @@ sanctions list, which refuses `0x…dEaD` even though both gates admit it.
 **4. The shielded middle runs.** One JoinSplit
 ([`0x30a74be8…`](https://testnet.monadexplorer.com/tx/0x30a74be85a99b68c4bd0a40a1beb7575b0b06686ed610993ed7f6aa38a8cac68),
 block 52209800) spent two of the issuer's positions and created two new ones. The inputs
-were 250 and 480, both public from their deposit transactions. The outputs are **270.1 and
-459.9, and neither figure appears anywhere on this chain** — only two nullifiers and two
-commitments. Nothing links an input to an output.
+were 250 and 480, both public from their deposit transactions. What the transfer put on
+chain is two nullifiers and two commitments, and nothing links an input to an output.
+
+The outputs are 270.1 and 459.9, and **neither figure was on this chain until a regulator
+asked for one.** Block 52210355 is where 459.9 became public — an exact disclosure answering
+a request posted ten blocks earlier — and once it is public the sibling follows by
+arithmetic. That is the design working rather than failing: a figure leaves this register
+only in answer to a question, and the chain records that the question came first.
 
 ```bash
 node ops/transfer.mjs --as issuer          # prove, publish the note root, spend
@@ -183,6 +188,16 @@ This is the operation the whole commitment scheme exists for, and it had never b
 on-chain until this build: `noteRoot()` was `0`, which made `transact()` unreachable rather
 than merely undemonstrated. The register now holds six commitments, four of them live
 positions — and which four is not public.
+
+**5. And value leaves it under the same rules.** A second JoinSplit
+([`0x08b6801b…`](https://testnet.monadexplorer.com/tx/0x08b6801b1cbcaa681f2a81d77628e4c88dcec9bf70793492663fa605422d0e3a),
+block 52220592) redeemed 50 units out of the register: 49.5 to a credentialed recipient and
+0.5 to a credentialed relayer, with 680 staying shielded inside. The exit is where
+Cleanverse's model is most opinionated — every address receiving a CVA needs a credential —
+so `transact()` calls `complianceVerify` twice more on that path, once for the recipient
+and once for the relayer. The pool's backing went 1,680 → 1,630 and the `Transacted` event
+records `withdrawn = 50000000`; which of the register's positions paid for it does not
+appear anywhere.
 
 **3. Revoke and freeze.** A verified holder deposited, then had its A-Pass frozen
 (`update_status` → live record `status: 2`). Both gates closed independently:
@@ -199,7 +214,7 @@ two.
 ## Repository
 
 ```
-contracts/     Foundry. SaksiPool + the seven exported Groth16 verifiers. 64 tests.
+contracts/     Foundry. SaksiPool + the seven exported Groth16 verifiers. 87 tests.
 circuits/      Circom sources, proving keys, witness calculators.
 ops/           The register's operations — issuance, association set, validator
                registration, deposits, disclosures, revocation.
@@ -211,7 +226,7 @@ docs/          Cleanverse API notes, findings, the business plan.
 
 ```bash
 # contracts
-cd contracts && forge test          # 64 passed
+cd contracts && forge test          # 87 passed
 
 # ops — install once, then set CV_API_ID / CV_API_KEY and a funded Monad key in .env
 npm install

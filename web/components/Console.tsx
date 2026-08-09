@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Asp, AuditEntry, Deployment, Measurement, Position } from "@/lib/types";
 import { useLive } from "@/lib/useLive";
+import HolderView from "./HolderView";
 import RegisterView from "./RegisterView";
 import IssuerView from "./IssuerView";
 import RegulatorView from "./RegulatorView";
@@ -10,6 +11,9 @@ import GatesView from "./GatesView";
 import { Badge } from "./bits";
 
 const TABS = [
+  // The holder first. Every other tab is evidence about the register; this one is the
+  // only screen that answers a question about the person looking at it.
+  { id: "holder", label: "Am I eligible?" },
   { id: "register", label: "Register" },
   { id: "gates", label: "Two gates" },
   { id: "issuer", label: "Issuer" },
@@ -31,7 +35,7 @@ export default function Console({
   positions: Position[];
   measurement: Measurement | null;
 }) {
-  const [tab, setTab] = useState<TabId>("register");
+  const [tab, setTab] = useState<TabId>("holder");
   const live = useLive(deployment);
 
   return (
@@ -92,6 +96,7 @@ export default function Console({
       </nav>
 
       <main role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
+        {tab === "holder" && <HolderView deployment={deployment} asp={asp} />}
         {tab === "register" && (
           <RegisterView
             deployment={deployment}

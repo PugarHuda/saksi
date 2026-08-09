@@ -22,17 +22,42 @@ export const SELECTORS = {
   balanceOf: "0x70a08231",
   isEligible: "0x66e305fd",
   totalSupply: "0x18160ddd",
+  // The pool derives the association-set leaf for an address itself, so the console can
+  // ask what a wallet's leaf is without shipping a keccak implementation to the browser.
+  sourceKeyOf: "0x49d3f9aa",
+  getDenyList: "0xd1329f0e",
 } as const;
+
+/** complianceVerify(address,address) on Cleanverse's Validator — their contract, not ours. */
+export const COMPLIANCE_VERIFY = "0xaf375463";
+
+/** Two address arguments, ABI-encoded. */
+export const pad2 = (a: string, b: string) =>
+  a.replace(/^0x/, "").toLowerCase().padStart(64, "0") +
+  b.replace(/^0x/, "").toLowerCase().padStart(64, "0");
+
+/** getDenyList() returns uint256[8] — a fixed array, so no offset word. */
+export function decodeDenyList(hex: string): bigint[] {
+  const body = hex.replace(/^0x/, "");
+  const out: bigint[] = [];
+  for (let i = 0; i < 8 && (i + 1) * 64 <= body.length; i++) {
+    out.push(BigInt("0x" + body.slice(i * 64, (i + 1) * 64)));
+  }
+  return out;
+}
 
 export type RuleV2 = {
   allowedGroup: string;
   allowedSubGroup: string;
   minTier: number;
   minSubTier: number;
+  isBlackList: boolean;
   countryBitmap: bigint;
 };
 
-/** activeRules() returns RuleV2[] — a dynamic array of five-word static structs. */
+/** activeRules() returns RuleV2[] — a dynamic array of SIX-word static structs. Cleanverse
+ *  published the missing isBlackList field on 9 Aug; decoding five words read the wrong
+ *  slot as the country bitmap, which only looked correct because both were zero. */
 export function decodeRules(hex: string): RuleV2[] {
   const body = hex.replace(/^0x/, "");
   if (body.length < 128) return [];
@@ -40,13 +65,14 @@ export function decodeRules(hex: string): RuleV2[] {
   const count = Number(BigInt("0x" + word(1)));
   const rules: RuleV2[] = [];
   for (let i = 0; i < count; i++) {
-    const at = 2 + i * 5;
+    const at = 2 + i * 6;
     rules.push({
       allowedGroup: "0x" + word(at).slice(0, 4),
       allowedSubGroup: "0x" + word(at + 1).slice(0, 4),
       minTier: Number(BigInt("0x" + word(at + 2))),
       minSubTier: Number(BigInt("0x" + word(at + 3))),
-      countryBitmap: BigInt("0x" + word(at + 4)),
+      isBlackList: BigInt("0x" + word(at + 4)) === 1n,
+      countryBitmap: BigInt("0x" + word(at + 5)),
     });
   }
   return rules;

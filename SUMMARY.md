@@ -69,13 +69,17 @@ posts a question on-chain and waits for a proof that answers exactly it.
 |---|---|
 | SaksiPool | [`0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA`](https://testnet.monadexplorer.com/address/0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA) |
 | Saksi Series A Note (our CVA) | [`0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B`](https://testnet.monadexplorer.com/address/0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B) |
-| Register | 6 commitments · 4 live positions · 1,680 CVA backed |
-| Foundry tests | **64 passing**, including an external audit's own exploit POCs |
+| Register | 8 commitments · 4 live positions · 1,630 CVA backed |
+| Foundry tests | **87 passing**, including an external audit's own exploit POCs |
 
-**The shielded middle runs.** One JoinSplit spent two of the issuer's positions and created
-two new ones (block 52209800). The inputs were 250 and 480; the outputs are **not published
-anywhere** — only their commitments and the two spent nullifiers are on-chain. Nothing links
-an input to an output.
+**The shielded middle runs, and so does the exit.** One JoinSplit spent two of the
+issuer's positions and created two new ones (block 52209800); the inputs were 250 and 480, and
+neither output was published — until the auditor asked, and block 52210355 disclosed 459.9
+in answer to a request posted ten blocks before it. A second JoinSplit then *redeemed* 50 out of
+the register (block 52220592) to a credentialed recipient, with 0.5 paid to a credentialed
+relayer — and that path calls Cleanverse's validator twice more, on the recipient and on the
+relayer, because their model holds that every address receiving a CVA needs a credential.
+Nothing links an input to an output on either transaction.
 
 ## The strongest evidence is a refusal
 
@@ -100,7 +104,7 @@ record permanently.
 Merkle depth 10 → **1,024 leaves**; the association set is at 524 of them today. Deposit
 costs ~2.9M gas (two Groth16 verifications plus the live validator call); verification 264k;
 proving 610–1,676 ms client-side. The aggregate circuit is fixed at **5 slots**, so it
-already cannot span a register of six commitments — after the shielded transfer the auditor
+already cannot span a register of eight commitments — after the shielded transfer the auditor
 enumerates the four live positions and the tool *refuses* rather than answering over a
 subset. Upgrades are known: depth 20 gives a million leaves at roughly double the compliance
 constraints; the aggregate widens with recursion.
@@ -132,6 +136,20 @@ by rebuild, and an auditor who can compel a bounded answer and get a *recorded n
 - **Both gates root in one authority.** They diverge in *time*, not in trust: a compromised
   Cleanverse sandbox defeats both.
 - **Single-EOA owner**, no timelock or multisig, who can rotate roots and set the auditor.
+- **A spent position can still answer an audit.** `_requireKnown` consults the commitment
+  set, and structurally cannot consult the nullifier set — deriving one from the other
+  on-chain is exactly what the design prevents. So a disclosure can truthfully answer about
+  a position that has since been spent. The auditor picks the subject, so this is a caveat
+  to state rather than a hole to plug.
+- **Published note roots accumulated.** Every root ever published stayed spendable, and
+  because a nullifier binds the leaf *index*, republishing a tree that moved an existing
+  commitment would mint a second valid nullifier for the same note. The builder is
+  append-only so this never happened, and the superseded root has now been retired — but
+  the contract does not enforce either, and a production deployment should.
+- **The transfer circuit bounds amounts to 248 bits while every disclosure circuit bounds
+  them to 64.** A JoinSplit that merged notes past 2⁶⁴ would spend and redeem normally and
+  could never be disclosed. Unreachable at this register's size; one line in
+  `transfer.circom` to close.
 - **We leaked our own secrets twice.** Testnet note keys for a superseded pool reached the
   public repo and survived two history rewrites, because GitHub serves orphaned commits by
   SHA. The repository was destroyed and recreated to purge the object store. Zero key reuse

@@ -59,11 +59,13 @@ privacy pool — destroys the accountability that made the asset legitimate.
 |---|---|
 | SaksiPool | `0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA` |
 | Saksi Series A Note (our CVA) | `0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B` |
-| Register | 6 commitments · 4 live positions · 1,680 CVA |
-| Tests | 64 passing, including an adversarial review's own exploit POCs |
+| Register | 8 commitments · 4 live positions · 1,630 CVA |
+| Tests | 87 passing, including an adversarial review's own exploit POCs |
 
-The shielded transfer runs on-chain: one JoinSplit spent two positions of 250 and 480 and
-created two whose amounts appear nowhere on the chain (block 52209800).
+Both halves run on-chain. One JoinSplit spent two positions of 250 and 480 and created two
+whose amounts appear nowhere (block 52209800). A second redeemed 50 out of the register to a
+credentialed recipient with 0.5 to a credentialed relayer (block 52220592) — the exit path
+calls your validator twice more, on the recipient and on the relayer.
 
 ## The one thing worth clicking
 
@@ -71,7 +73,7 @@ Every audit answer is bound to a request the auditor — **a different key from 
 posted on-chain before the answer existed, and every request block precedes its answer block.
 
 The strongest row is a failure. The auditor asked whether total exposure across the four live
-positions is at most 1,000 when it is in fact 1,680. **No proof exists**, so request block
+positions is at most 1,000 when those positions in fact summed to 1,680. **No proof exists**, so request block
 `52210907` is open and stays open. The register cannot answer falsely; it can only fail to
 answer, and the failure is permanent and public.
 
