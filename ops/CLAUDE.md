@@ -11,7 +11,22 @@ Safe to run any time:
 node ops/evidence.mjs [--md]   # rebuild the evidence table from chain
 node ops/gas.mjs               # gas figures via eth_estimateGas
 node ops/cva-gate.mjs          # the two gates, side by side
+node ops/check.mjs             # does every script here still parse? (wired into npm test)
 ```
+
+Read-only against the chain but it **overwrites `notes.public.json`**, which is why it is not
+in the list above — this file warns against exactly that reading:
+
+```bash
+node ops/publish-index.mjs [--dry]
+```
+
+`publish-index.mjs` reads the index out of the chain's own insertion log and never opens a
+ledger. That is not a convenience: the index used to be written from the ledgers, which drop a
+position when it is spent, so the published file WAS the live set — and nothing else publishes
+that, since a nullifier cannot be tied to its leaf without the key. An adversarial review took
+the spent set by subtraction, forced every JoinSplit's inputs by elimination, and recovered
+270.1 CVA on leaf 4 that no audit had disclosed. **Never reintroduce a liveness field here.**
 
 Everything else changes something. Five broadcast transactions —
 `deposit.mjs`, `transfer.mjs`, `audit.mjs`, `setup-pool.mjs`,

@@ -275,8 +275,11 @@ circuits/      Circom sources, proving keys, witness calculators.
 ops/           The register's operations — issuance, association set, validator
                registration, deposits, disclosures, revocation.
 web/           The console, six tabs: Evidence, Am I eligible?, Register,
-               Two gates, Issuer, Regulator.
+               Two gates, Issuer, Regulator — plus /deck, fifteen slides that read
+               their figures from the same artefacts the console does.
 docs/          Cleanverse API notes, findings, the business plan.
+ONEPAGE.md     The one-page summary the submission is judged on. ONEPAGE.pdf beside it.
+SUMMARY.md     The long version behind that page.
 ```
 
 ## Running it
@@ -287,6 +290,7 @@ cd contracts && forge test          # 173 passed
 
 # ops — install once, then set CV_API_ID / CV_API_KEY and a funded Monad key in .env
 npm install
+npm test                            # parses every ops script, then the Foundry suite
 node ops/smoke.mjs                  # live sandbox check
 node ops/asp.mjs build              # rebuild the association set from live CVI
 node ops/deposit.mjs 250            # prove eligibility, enter the register
