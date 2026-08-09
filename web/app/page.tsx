@@ -20,7 +20,11 @@ export default function Page() {
   const asp = read<Asp | null>("asp.json", null);
   const audit = read<AuditEntry[]>("audit-log.json", []);
   const positions = read<Position[]>("notes.json", []);
-  const measurement = read<Measurement | null>("measurement.json", null);
+
+  // A half-written snapshot must render as absent, not crash the page: check the field
+  // the view actually dereferences rather than trusting the file to be well formed.
+  const raw = read<Measurement | null>("measurement.json", null);
+  const measurement = raw && typeof raw.measuredAt === "string" && raw.assets ? raw : null;
 
   return (
     <Console

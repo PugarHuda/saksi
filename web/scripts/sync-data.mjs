@@ -14,10 +14,18 @@ fs.mkdirSync(out, { recursive: true });
 const files = ["deployment.json", "asp.json", "audit-log.json", "notes.json", "measurement.json"];
 for (const f of files) {
   const src = path.join(root, f);
+  const dst = path.join(out, f);
+
+  // On a build host only `web/` is uploaded, so the repo-root sources are absent. The
+  // committed copy in public/data is then the authoritative one — overwriting it with a
+  // placeholder is how the deployed console silently lost its data.
   if (!fs.existsSync(src)) {
-    console.warn(`sync-data: ${f} missing, writing an empty placeholder`);
-    const empty = f === "notes.json" || f === "audit-log.json" ? "[]" : "{}";
-    fs.writeFileSync(path.join(out, f), empty);
+    if (fs.existsSync(dst)) {
+      console.log(`sync-data: ${f} source absent, keeping the committed copy`);
+    } else {
+      console.warn(`sync-data: ${f} missing entirely, writing an empty placeholder`);
+      fs.writeFileSync(dst, f === "notes.json" || f === "audit-log.json" ? "[]" : "null");
+    }
     continue;
   }
   let data = JSON.parse(fs.readFileSync(src, "utf8"));
@@ -34,6 +42,6 @@ for (const f of files) {
       leafIndex: n.leafIndex,
     }));
   }
-  fs.writeFileSync(path.join(out, f), JSON.stringify(data, null, 2));
+  fs.writeFileSync(dst, JSON.stringify(data, null, 2));
   console.log(`sync-data: ${f}`);
 }
