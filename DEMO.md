@@ -49,9 +49,10 @@ Point at the request and answer block numbers.
 
 Then point at the last row.
 
-> "This is the row I care about. The auditor asked whether total exposure across the
-> register's four live positions is at most one thousand. It is one thousand six hundred and
-> eighty. **No proof exists**, so the request is still open at block 52210907 and it will be
+> "This is the row I care about. The auditor asked whether total exposure across the four
+> positions it named is at most one thousand. Those positions summed to one thousand six
+> hundred and eighty, and the register backs one thousand six hundred and thirty today after
+> a redemption — either way, over the cap. **No proof exists**, so the request is still open at block 52210907 and it will be
 > open forever. This register cannot answer falsely. It can only fail to answer, and the
 > failure is on the record."
 
@@ -93,9 +94,10 @@ Point at the burn address row.
 > immediately, while the anchored root still admits until I rebuild. Neither one subsumes
 > the other."
 
-> "And there is a third control that is neither: the entry proof also shows the depositor is
-> absent from an on-chain sanctions list. The burn address passes Cleanverse and is in my
-> set — and the deny list refuses it anyway."
+> "And there is a third control that is neither, in the last two columns. The entry proof
+> also shows the depositor is absent from an on-chain sanctions list. Read the burn address
+> row across: Cleanverse admits it, my set holds a witness for it, the deny list refuses it,
+> and the verdict is no. Three questions, and only the third one stops it."
 
 > **Say this out loud:** "An earlier version of this demo claimed the ZK gate caught the
 > burn address where Cleanverse missed it. That was wrong, and it was my bug — a status
@@ -156,8 +158,8 @@ node ops/asp.mjs build
 cd contracts && forge test
 ```
 
-> "Eighty-seven tests, including the exploit proofs from an adversarial review of this
-> codebase — kept as regression tests, and three of them assert limitations that are still
+> "Eighty-nine tests, including the exploit proofs from an adversarial review of this
+> codebase — kept as regression tests, and seven of them assert limitations that are still
 > open."
 
 > "Saksi. Every position witnessed. Disclosure only when asked."

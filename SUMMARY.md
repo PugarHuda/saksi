@@ -50,8 +50,8 @@ posts a question on-chain and waits for a proof that answers exactly it.
 2. **The asset is a real CVA.** `SAKSIAZEV` was issued through `atoken/launch` carrying a
    `min_tier 30` rule from issuance. `activeRules()` on our pool and `getRulesV2()` on
    theirs return the identical `(0x0000, 0x0000, 30, 0, false, 0)`.
-3. **The association set is derived from live CVI.** 524 members admitted from a population
-   of 602, rebuilt from A-Pass state on every run, root anchored on-chain. `ops/gate-gap.mjs`
+3. **The association set is derived from live CVI.** 524 members admitted from a population of 602 at
+   10:07 UTC — the census an hour earlier enumerated 562, which is why the two figures differ — rebuilt from A-Pass state on every run, root anchored on-chain. `ops/gate-gap.mjs`
    asks the validator about **every one of the 524** — all are admitted by Cleanverse too,
    which is the only acceptable answer: a set derived from their registry must never be more
    permissive than it. Earlier today fifteen frozen credentials were in it and the check was
@@ -70,7 +70,7 @@ posts a question on-chain and waits for a proof that answers exactly it.
 | SaksiPool | [`0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA`](https://testnet.monadexplorer.com/address/0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA) |
 | Saksi Series A Note (our CVA) | [`0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B`](https://testnet.monadexplorer.com/address/0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B) |
 | Register | 8 commitments · 4 live positions · 1,630 CVA backed |
-| Foundry tests | **87 passing**, including two external audits' own exploit POCs |
+| Foundry tests | **89 passing**, including two external audits' own exploit POCs |
 
 **The shielded middle runs, and so does the exit.** One JoinSplit spent two of the
 issuer's positions and created two new ones (block 52209800); the inputs were 250 and 480, and
@@ -94,7 +94,7 @@ checkable with any RPC endpoint:
 | inside the 400–500 bracket? | 52210670 | 52210679 · proved, figure hidden |
 | total exposure ≤ 2,000? | 52210870 | 52210883 · proved, no position disclosed |
 | inside the 100–400 bracket? | 52210333 | **never — no proof exists** |
-| **total exposure ≤ 1,000?** | **52210907** | **never — the true total is 1,680** |
+| **total exposure ≤ 1,000?** | **52210907** | **never — those positions summed to 1,680** |
 
 The register cannot answer falsely. It can only fail to answer, and the failure is on the
 record permanently.
@@ -203,12 +203,12 @@ and reporting "0 disagreements" for a set of five hundred. It sweeps every membe
 
 ## What the tests do and do not prove
 
-The 87 Foundry tests exercise the pool's binding, accounting and access control against a
+The 89 Foundry tests exercise the pool's binding, accounting and access control against a
 mock verifier that returns a settable boolean — they prove the contract's logic, not the
 Groth16 cryptography. The cryptography is proved by the chain instead: every deposit,
 transfer, withdrawal and disclosure above was accepted by a deployed verifier contract whose
-verification key is committed in this repo. Twenty-three of the tests are an adversarial
-review's own exploit proofs, kept as regression tests, and three of those assert limitations
+verification key is committed in this repo. Forty-five of the tests are two adversarial
+reviews' own exploit proofs, kept as regression tests, and seven of those assert limitations
 that remain open rather than pretending they were closed.
 
 ## Prior work, declared

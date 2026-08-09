@@ -60,7 +60,7 @@ privacy pool — destroys the accountability that made the asset legitimate.
 | SaksiPool | `0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA` |
 | Saksi Series A Note (our CVA) | `0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B` |
 | Register | 8 commitments · 4 live positions · 1,630 CVA |
-| Tests | 87 passing, including an adversarial review's own exploit POCs |
+| Tests | 89 passing, including an adversarial review's own exploit POCs |
 
 Both halves run on-chain. One JoinSplit spent two positions of 250 and 480 and created two
 whose amounts appear nowhere (block 52209800). A second redeemed 50 out of the register to a

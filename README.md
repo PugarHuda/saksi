@@ -92,7 +92,7 @@ proof, so the position cannot be re-entered or topped up. Be precise about the o
 edge, though: the exit is gated on whoever *submits* the transfer, not on the note's
 owner, so an eligible party could relay a revoked holder out. Entry is gated
 cryptographically; the exit is gated operationally, and the difference is real. We ran this end to end:
-see [the demonstrations](#four-demonstrations) below.
+see [the demonstrations](#five-demonstrations) below.
 
 ### Answerability without disclosure
 
@@ -168,6 +168,18 @@ anchored set is what still binds when an operator never rotates. And a third con
 neither of them — the entry proof also shows the depositor is absent from an on-chain
 sanctions list, which refuses `0x…dEaD` even though both gates admit it.
 
+**3. Revoke and freeze.** A verified holder deposited, then had its A-Pass frozen
+(`update_status` → live record `status: 2`). Both gates closed independently:
+`complianceVerify(pool, holder)` on Cleanverse's validator went `true → false`, and the
+association set rebuilt without it — recorded in `asp.json` as
+`its dropped list`, with the previous set kept in `asp.previous.json`.
+The next deposit reverts `ValidatorRefused` at gate one and has no witness at gate
+two.
+
+> `isEligible(address)` is **Saksi's** view on the pool, which forwards to Cleanverse's
+> `complianceVerify(pool, wallet)`. The validator itself exposes no `isEligible` — that
+> call reverts on their contract. The distinction matters when reproducing these results.
+
 **4. The shielded middle runs.** One JoinSplit
 ([`0x30a74be8…`](https://testnet.monadexplorer.com/tx/0x30a74be85a99b68c4bd0a40a1beb7575b0b06686ed610993ed7f6aa38a8cac68),
 block 52209800) spent two of the issuer's positions and created two new ones. The inputs
@@ -186,7 +198,7 @@ node ops/transfer.mjs --as issuer          # prove, publish the note root, spend
 
 This is the operation the whole commitment scheme exists for, and it had never been executed
 on-chain until this build: `noteRoot()` was `0`, which made `transact()` unreachable rather
-than merely undemonstrated. The register now holds six commitments, four of them live
+than merely undemonstrated. The register now holds eight commitments, four of them live
 positions — and which four is not public.
 
 **5. And value leaves it under the same rules.** A second JoinSplit
@@ -199,22 +211,11 @@ and once for the relayer. The pool's backing went 1,680 → 1,630 and the `Trans
 records `withdrawn = 50000000`; which of the register's positions paid for it does not
 appear anywhere.
 
-**3. Revoke and freeze.** A verified holder deposited, then had its A-Pass frozen
-(`update_status` → live record `status: 2`). Both gates closed independently:
-`complianceVerify(pool, holder)` on Cleanverse's validator went `true → false`, and the
-association set rebuilt without it — recorded in `asp.json` as
-`its dropped list`, with the previous set kept in `asp.previous.json`.
-The next deposit reverts `ValidatorRefused` at gate one and has no witness at gate
-two.
-
-> `isEligible(address)` is **Saksi's** view on the pool, which forwards to Cleanverse's
-> `complianceVerify(pool, wallet)`. The validator itself exposes no `isEligible` — that
-> call reverts on their contract. The distinction matters when reproducing these results.
 
 ## Repository
 
 ```
-contracts/     Foundry. SaksiPool + the seven exported Groth16 verifiers. 87 tests.
+contracts/     Foundry. SaksiPool + the seven exported Groth16 verifiers. 89 tests.
 circuits/      Circom sources, proving keys, witness calculators.
 ops/           The register's operations — issuance, association set, validator
                registration, deposits, disclosures, revocation.
@@ -226,7 +227,7 @@ docs/          Cleanverse API notes, findings, the business plan.
 
 ```bash
 # contracts
-cd contracts && forge test          # 87 passed
+cd contracts && forge test          # 89 passed
 
 # ops — install once, then set CV_API_ID / CV_API_KEY and a funded Monad key in .env
 npm install
@@ -268,7 +269,7 @@ builder, the disclosure flow, the deployment, and the consoles.
 - **Both gates root in one authority.** They diverge in *time*, not in trust. A compromised
   Cleanverse sandbox defeats both.
 - **`denyList` is an 8-slot fixed array**, and the aggregate circuit is fixed at 5 slots —
-  the register already holds six commitments, so the aggregate cannot span it and refuses
+  the register already holds eight commitments, so the aggregate cannot span it and refuses
   rather than answering over a subset. Merkle depth 10 caps every tree at 1,024 leaves.
 - **Single-EOA owner**, no timelock or multisig, who can rotate roots and set the auditor.
 - Everything is Monad testnet, and the Cleanverse sandbox is shared across hackathon teams,

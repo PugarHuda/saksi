@@ -1,7 +1,7 @@
 {
   "name": "saksi",
   "version": "1.0.0",
-  "description": "",
+  "description": "A confidential holder register for tokenized real-world assets, on Cleanverse CVI and CVA.",
   "main": "index.js",
   "directories": {
     "doc": "docs"
@@ -10,10 +10,10 @@
     "test": "cd contracts && forge test"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "author": "Pugar Huda Mantoro",
+  "license": "MIT",
   "type": "module",
-  "private": "true",
+  "private": true,
   "dependencies": {
     "circomlibjs": "^0.1.7",
     "js-sha3": "^0.13.0",

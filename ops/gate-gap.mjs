@@ -29,6 +29,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { ROOT, RPC, readDeployment } from "./env.mjs";
+import { sourceKeyOf } from "./asp.mjs";
 
 const dep = readDeployment();
 const aspPath = ["asp.json", "asp.public.json"]
@@ -52,6 +53,17 @@ const call = (to, sig, ...args) =>
 
 // The published set reduces members this project does not operate to leaves, so a wallet
 // is optional here — and membership is a property of the leaf in any case.
+// cast prints each element with a human-readable exponent glued on — "5685… [5.685e75]" —
+// so the annotation has to come off per element; stripping brackets globally merges the
+// digits with the exponent and every lookup silently misses.
+const denyList = new Set(
+  call(dep.pool, "getDenyList()(uint256[8])")
+    .replace(/^\[|\]$/g, "")
+    .split(",")
+    .map((x) => (x.trim().match(/^\d+/) ?? ["0"])[0])
+    .filter((x) => x !== "0"),
+);
+
 const inSet = (addr) =>
   asp.members.some((m) => m.wallet && m.wallet.toLowerCase() === addr.toLowerCase());
 
@@ -83,7 +95,8 @@ console.log(`asp root  ${asp.root}`);
 console.log(`          ${asp.admitted} members, built ${asp.builtAt}\n`);
 
 const head = [
-  "subject", "", "gate 1 · Cleanverse", "gate 2 · set now", "gate 2 · set before rebuild", "admitted?",
+  "subject", "", "gate 1 · Cleanverse", "gate 2 · set now", "gate 2 · set before rebuild",
+  "deny list", "enters?",
 ];
 const rows = [head, head.map((h) => "-".repeat(Math.max(h.length, 3)))];
 
@@ -96,13 +109,18 @@ for (const [addr, name] of SUBJECTS) {
     gate1 = null;
   }
   const gate2 = inSet(addr);
+  // The deny list is the third control and deposit() enforces it, so a verdict drawn from
+  // two gates is wrong — and wrong permissively. 0x…dEaD passes Cleanverse, holds a witness
+  // in the set, and is still refused at entry because its leaf is on the list.
+  const denied = denyList.has(sourceKeyOf(addr).toString());
   rows.push([
     addr.slice(0, 10) + "…" + addr.slice(-6),
     name || label(addr),
     gate1 === null ? "reverted" : gate1 ? "ADMITS" : "refuses",
     gate2 ? "ADMITS" : "no witness",
     prev ? (inPrevSet(addr) ? "ADMITS" : "no witness") : "—",
-    gate1 && gate2 ? "yes" : "no",
+    denied ? "LISTED" : "clear",
+    gate1 && gate2 && !denied ? "yes" : "no",
   ]);
 }
 
@@ -143,6 +161,11 @@ if (staleWindow.length) {
 // the safety direction the whole design rests on.
 
 const members = asp.members ?? [];
+// Only members carrying an address can be put to the validator. Run from a clone the
+// published set is leaf-only for everyone this project does not operate, so the sweep
+// covers a dozen — and reporting that as 524 would be the same over-claim this script
+// already made once, in the one sentence a reader would screenshot.
+const addressable = members.filter((m) => m.wallet).length;
 const CONC = 4; // the public RPC rate-limits well below this on bursts
 let cursor = 0;
 const refused = [];
@@ -168,7 +191,6 @@ async function worker() {
 // is available and it carries addresses for the members this project operates — so the
 // sweep covers a dozen, not five hundred, and reporting it as a full sweep would be exactly
 // the over-claim this script already made once.
-const addressable = members.filter((m) => m.wallet).length;
 if (addressable < members.length) {
   console.log(`\n${members.length - addressable} of ${members.length} members are published as`);
   console.log("leaves only, so the validator cannot be asked about them from this copy of the");
@@ -184,8 +206,13 @@ if (unanswered) {
 }
 
 if (refused.length === 0) {
-  console.log(`All ${members.length - unanswered} answered members are admitted by Cleanverse too.`);
-  console.log("The set is faithful to the registry and never more permissive than it.");
+  console.log(`All ${addressable - unanswered} addressable members are admitted by Cleanverse too.`);
+  console.log("");
+  console.log("Read that for what it is. This set is BUILT by applying Cleanverse's own predicate to");
+  console.log("Cleanverse's own registry, so the result holds by construction at the instant of the");
+  console.log("read — a member can only be refused if the registry moved in between, which is exactly");
+  console.log("the temporal gap the live gate exists to close. The sweep earns its keep by catching a");
+  console.log("builder that has drifted, not because passing it proves anything structural.");
 } else {
   console.log(`${refused.length} member(s) hold a witness in this set that Cleanverse REFUSES:`);
   for (const m of refused.slice(0, 20)) {

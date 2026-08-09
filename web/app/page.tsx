@@ -3,10 +3,27 @@ import { read } from "@/lib/snapshot";
 import { addrUrl } from "@/lib/chain";
 import type { AuditEntry, Deployment, Measurement, Position } from "@/lib/types";
 
+const DESCRIPTION =
+  "Compliant assets have tiny holder sets, so pseudonymity protects nobody. Saksi shields " +
+  "the positions and keeps entry, exit and audit answerable — on Cleanverse CVI and CVA.";
+
 export const metadata = {
   title: "Saksi — a confidential holder register for tokenized assets",
-  description:
-    "Compliant assets have tiny holder sets, so pseudonymity protects nobody. Saksi shields the positions and keeps entry, exit and audit answerable — on Cleanverse CVI and CVA.",
+  description: DESCRIPTION,
+  metadataBase: new URL("https://saksi-gilt.vercel.app"),
+  // A submission that travels as a pasted link renders as a bare grey card without these.
+  openGraph: {
+    title: "Saksi — a confidential holder register",
+    description: DESCRIPTION,
+    url: "https://saksi-gilt.vercel.app",
+    siteName: "Saksi",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Saksi — a confidential holder register",
+    description: DESCRIPTION,
+  },
 };
 
 export default function Landing() {
