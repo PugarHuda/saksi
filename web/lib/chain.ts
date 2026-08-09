@@ -26,6 +26,11 @@ export const SELECTORS = {
   // ask what a wallet's leaf is without shipping a keccak implementation to the browser.
   sourceKeyOf: "0x49d3f9aa",
   getDenyList: "0xd1329f0e",
+  // The audit request as the contract holds it. auditAnswered is 0 while a request is open
+  // and the DisclosureKind once it closes, so the chain — not this bundle — is what says a
+  // question was never answered. auditClaim is the figure, hashed before any answer existed.
+  auditClaim: "0xfe97ac22",
+  auditAnswered: "0x5ced5a7c",
 } as const;
 
 /** complianceVerify(address,address) on Cleanverse's Validator — their contract, not ours. */
@@ -78,20 +83,57 @@ export function decodeRules(hex: string): RuleV2[] {
   return rules;
 }
 
-async function rpc(method: string, params: unknown[]): Promise<string> {
-  const res = await fetch(RPC, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
-    cache: "no-store",
-  });
-  if (!res.ok) throw new Error(`rpc ${res.status}`);
-  const body = await res.json();
-  if (body.error) throw new Error(body.error.message ?? "rpc error");
-  return body.result as string;
+/** An RPC that never answers used to leave every skeleton shimmering for as long as the tab
+ *  stayed open — the one failure mode with no message at all. A bounded wait turns it into
+ *  an error the views already know how to render. */
+const TIMEOUT_MS = 12_000;
+
+async function rpc<T = string>(method: string, params: unknown[]): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(RPC, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+    });
+  } catch (e) {
+    // Every message below is read by a human on a card, so none of them is a stack trace.
+    const name = (e as Error).name;
+    throw new Error(
+      name === "TimeoutError" || name === "AbortError"
+        ? `Monad did not answer within ${TIMEOUT_MS / 1000}s.`
+        : "Could not reach Monad — the network or the RPC endpoint is unavailable.",
+    );
+  }
+  if (!res.ok) throw new Error(`Monad refused the read (HTTP ${res.status}).`);
+  let body: { error?: { message?: string }; result?: T };
+  try {
+    body = await res.json();
+  } catch {
+    throw new Error("The RPC endpoint returned something that is not JSON.");
+  }
+  if (body.error) throw new Error(body.error.message ?? "The RPC endpoint returned an error.");
+  return body.result as T;
 }
 
 const pad = (addr: string) => addr.replace(/^0x/, "").toLowerCase().padStart(64, "0");
+
+/** A uint256 argument — the audit context hashes are decimal field elements, not addresses. */
+export const padUint = (v: string | bigint) => BigInt(v).toString(16).padStart(64, "0");
+
+/** The block a transaction landed in, or null if this node has no receipt for it. Audit-log
+ *  hashes are immutable, so one lookup each per session is enough. */
+const blocks = new Map<string, number | null>();
+export async function blockOf(hash: string): Promise<number | null> {
+  const hit = blocks.get(hash);
+  if (hit !== undefined) return hit;
+  const r = await rpc<{ blockNumber?: string } | null>("eth_getTransactionReceipt", [hash]);
+  const n = r?.blockNumber ? Number(BigInt(r.blockNumber)) : null;
+  blocks.set(hash, n);
+  return n;
+}
 
 export async function call(to: string, data: string): Promise<string> {
   return rpc("eth_call", [{ to, data }, "latest"]);

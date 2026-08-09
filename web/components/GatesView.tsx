@@ -1,12 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { RPC, short } from "@/lib/chain";
+import { COMPLIANCE_VERIFY, SELECTORS, call, decodeDenyList, pad2, short } from "@/lib/chain";
 import type { Asp, Deployment } from "@/lib/types";
 import { Addr, Badge, ErrorBox, Skeleton } from "./bits";
-
-const CV = "0xaf375463"; // complianceVerify(address,address) on Cleanverse's validator
-const pad = (a: string) => a.replace(/^0x/, "").toLowerCase().padStart(64, "0");
 
 const BURN = "0x000000000000000000000000000000000000dEaD";
 const ONES = "0x1111111111111111111111111111111111111111";
@@ -17,6 +14,10 @@ type Row = {
   gate1: boolean | null;
   gate2: boolean;
   gate2Prev: boolean | null;   // null = no earlier set on record
+  // deposit() enforces a third condition the first two say nothing about. Leaving it out
+  // made this tab answer "enters: yes" for the burn address while the holder tab, reading
+  // the same deny list from the same contract, answered "refused".
+  denied: boolean;
 };
 
 export default function GatesView({
@@ -61,26 +62,20 @@ export default function GatesView({
       const keyOf = (a: string) =>
         asp.subjects?.find((s) => s.address.toLowerCase() === a.toLowerCase());
 
+      // One read of the pool's sanctions list for the whole table, not one per row.
+      const deny = await call(deployment.pool!, SELECTORS.getDenyList)
+        .then(decodeDenyList)
+        .catch(() => [] as bigint[]);
+
       const out = await Promise.all(
         subjects.map(async ([address, name]) => {
           let gate1: boolean | null = null;
           try {
-            const res = await fetch(RPC, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                jsonrpc: "2.0",
-                id: 1,
-                method: "eth_call",
-                params: [
-                  { to: deployment.validator, data: CV + pad(deployment.pool!) + pad(address) },
-                  "latest",
-                ],
-              }),
-              cache: "no-store",
-            });
-            const body = await res.json();
-            gate1 = body.error ? null : BigInt(body.result) === 1n;
+            const res = await call(
+              deployment.validator!,
+              COMPLIANCE_VERIFY + pad2(deployment.pool!, address),
+            );
+            gate1 = BigInt(res) === 1n;
           } catch {
             gate1 = null;
           }
@@ -91,6 +86,7 @@ export default function GatesView({
             gate1,
             gate2: s?.inSet ?? false,
             gate2Prev: s ? s.inPreviousSet : null,
+            denied: !!s && deny.some((d) => d !== 0n && d.toString() === s.sourceKey),
           };
         }),
       );
@@ -106,10 +102,20 @@ export default function GatesView({
     load();
   }, [load]);
 
-  const disagreements = rows?.filter((r) => (r.gate1 === true) !== r.gate2) ?? [];
-  // Refused live, but the previous anchored root still admits them. This is the temporal
-  // divergence the two gates exist for, and it is invisible without the earlier set.
-  const stale = rows?.filter((r) => r.gate1 === false && r.gate2Prev === true) ?? [];
+  // A row the validator did not answer is not a row the gates disagree about. Counting
+  // gate1 === null as "not equal to gate2" made an unreachable RPC print a confident
+  // finding — four subjects "answered differently by the two gates" when nothing had
+  // answered at all.
+  const answered = rows?.filter((r) => r.gate1 !== null) ?? [];
+  const silent = !!rows && rows.length > 0 && answered.length === 0;
+  const disagreements = answered.filter((r) => r.gate1 !== r.gate2);
+  // Refused live while an anchored root still admits them. That is the temporal divergence
+  // the two gates exist for, and it is invisible without the earlier set.
+  const stale = answered.filter((r) => r.gate1 === false && (r.gate2 || r.gate2Prev === true));
+  // Which root still carries the witness decides the sentence: saying "no witness in the
+  // current set" about a row whose own cell reads "admits" is the console contradicting
+  // itself on the tab that carries the argument.
+  const staleInCurrentSet = stale.some((r) => r.gate2);
 
   return (
     <div className="grid">
@@ -132,6 +138,9 @@ export default function GatesView({
           the set anchored at{" "}
           <code className="mono">{asp ? short(asp.root, 10, 6) : "—"}</code>
           {asp && ` · ${asp.admitted} members · built ${asp.builtAt.replace("T", " ").slice(0, 16)} UTC`}.
+          The last column also applies this pool&apos;s on-chain deny list, which is the third
+          condition <code className="mono">deposit()</code> enforces — two gates decide
+          eligibility, three decide entry.
         </p>
 
         <div className="scroll">
@@ -190,7 +199,11 @@ export default function GatesView({
                           )}
                         </td>
                         <td>
-                          {r.gate1 === true && r.gate2 ? (
+                          {r.gate1 === null ? (
+                            <Badge tone="warn">unknown</Badge>
+                          ) : r.denied ? (
+                            <Badge tone="no">no · deny-listed</Badge>
+                          ) : r.gate1 && r.gate2 ? (
                             <Badge tone="ok">yes</Badge>
                           ) : (
                             <Badge tone={split ? "warn" : "no"}>no</Badge>
@@ -207,12 +220,22 @@ export default function GatesView({
       {rows && (
         <section className="card">
           <h2>What the comparison found</h2>
-          {stale.length > 0 ? (
+          {silent ? (
             <p className="callout">
-              <strong>{stale.map((d) => d.name).join(", ")}</strong> is refused by Cleanverse
-              right now, holds no witness in the current set — and{" "}
-              <strong>is still admitted by the root anchored before the last rebuild</strong>.
-              That is the window the live gate exists to close: between a credential changing
+              Cleanverse&apos;s Validator did not answer for any subject just now, so there is
+              nothing to compare. The right-hand columns are the anchored set, which is a file
+              this page already holds — they are still correct. Retry above once the RPC
+              endpoint is reachable.
+            </p>
+          ) : stale.length > 0 ? (
+            <p className="callout">
+              <strong>{stale.map((d) => d.name).join(", ")}</strong>{" "}
+              {stale.length === 1 ? "is" : "are"} refused by Cleanverse right now and{" "}
+              <strong>
+                still admitted by the root anchored{" "}
+                {staleInCurrentSet ? "today" : "before the last rebuild"}
+              </strong>
+              . That is the window the live gate exists to close: between a credential changing
               and the issuer rotating the root, the anchored set is stale by construction. The
               live call refuses them today; the anchored set is what still binds when an
               operator never rotates. Neither gate subsumes the other.

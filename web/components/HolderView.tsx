@@ -90,6 +90,10 @@ export default function HolderView({
       if (addr) {
         setInput(addr);
         run(addr);
+      } else {
+        // A locked wallet resolves with an empty array. Without this the button did nothing
+        // at all — no result, no error, no way to tell it had been clicked.
+        setError("Your wallet returned no accounts. Unlock it, or paste an address instead.");
       }
     } catch {
       setError("Wallet request was refused.");

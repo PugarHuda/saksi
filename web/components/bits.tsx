@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { addrUrl, txUrl, short } from "@/lib/chain";
 
 export function Badge({

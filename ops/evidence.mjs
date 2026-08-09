@@ -90,6 +90,49 @@ for (const [who, addr] of [
 }
 if (md) line("```");
 
+// The ASSET gate, beside the POOL gate above.
+//
+// These are two different questions and the project's writeup says so, which is worth
+// nothing unless both answers are on the same page. The pool gate asks whether a wallet
+// satisfies THIS REGISTER's rule; verify_apass asks whether it may hold THIS A-TOKEN at
+// all, under the rule the asset carried from issuance. A wallet can pass one and fail the
+// other, and Cleanverse enforces the second on every transfer whether we call it or not.
+//
+// Skipped without credentials rather than failing: the chain half of this artefact must
+// still render for someone who cloned the repo and has no API key.
+try {
+  const { Cleanverse } = await import("./cleanverse.mjs");
+  const cv = new Cleanverse();
+  line();
+  line(md ? "### The asset gate — Cleanverse's rule on the A-Token itself" : "ASSET GATE (verify_apass)");
+  line();
+  if (md) line("```");
+  // Posture, not rules: atoken/rules answers 0000 with an empty array for an address that
+  // is not an A-Token at all, so an unknown asset would print as one that admits everyone.
+  const { rules, paused } = await cv.atokenPosture(dep.chain, dep.asset);
+  line(`atoken.rules(${dep.assetSymbol})`.padEnd(46) +
+    (rules.length
+      ? rules.map((r) => `min_tier ${r.min_tier}${r.countries?.length ? ` countries ${r.countries.join(",")}` : ""}`).join(" | ")
+      : "none"));
+  line(`atoken.is_paused(${dep.assetSymbol})`.padEnd(46) + String(paused));
+
+  const wallets = fs.existsSync(path.join(ROOT, "wallets.json"))
+    ? JSON.parse(fs.readFileSync(path.join(ROOT, "wallets.json"), "utf8"))
+    : [];
+  const seen = new Set();
+  for (const w of wallets.filter((x) => x.label && x.label !== "pool")) {
+    if (seen.has(w.address.toLowerCase())) continue;
+    seen.add(w.address.toLowerCase());
+    const r = await cv.verifyApass(dep.chain, dep.asset, w.address);
+    const pool = await call(dep.validator, CV + pad(dep.pool) + pad(w.address));
+    line(`  ${w.label.padEnd(10)} asset ${String(r.code).padEnd(2)} ${(r.message ?? "").padEnd(28)}pool ${BigInt(pool) === 1n}`);
+  }
+  if (md) line("```");
+} catch (e) {
+  line();
+  line(`(asset gate skipped — ${e.message.split("\n")[0]})`);
+}
+
 line();
 line(md ? "### Disclosures — the question is registered before the answer exists" : "DISCLOSURES");
 line();

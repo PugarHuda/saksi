@@ -105,18 +105,48 @@ words — "at most 500", "the 400–500 bracket", "at most 1,000" — equals wha
 stored. A reader can check that the question asked is the question the contract will accept
 an answer to, without trusting this document.
 
-## Scalability — the ceilings, named
+## Scalability — the ceilings, priced
 
-Merkle depth 10 → **1,024 leaves**; the association set is at 524 of them today. Proving runs 610–1,727 ms client-side, which is the one performance figure in this
-project that is checkable — it is recorded per row in `audit-log.json`. Gas is not: Monad
-charges the submitted limit and reports it back as `gasUsed`, so every receipt here reads
-`gasUsed == gasLimit` and no on-chain gas number can be reproduced. The Foundry suite
-measures a deposit at ~2.9M and a disclosure verification at ~264k, and that is a local
-measurement, not an observation of this chain. The aggregate circuit is fixed at **5 slots**, so it
-already cannot span a register of eight commitments — after the shielded transfer the auditor
-enumerates the four live positions and the tool *refuses* rather than answering over a
-subset. Upgrades are known: depth 20 gives a million leaves at roughly double the compliance
-constraints; the aggregate widens with recursion.
+The ceilings this project ships with are compile-time constants, and naming them is only
+half an answer. Here is what they cost, measured with Monad's own estimator against proofs
+this register actually submitted — `verifyProof` is a view, so every one of them is
+replayable by anyone (`node ops/gas.mjs`):
+
+| circuit | public signals | gas |
+|---|---|---|
+| exact · threshold | 3 | 1,034,215 |
+| range | 4 | 1,065,516 |
+| transfer (JoinSplit) | 7 | 1,160,784 |
+| aggregate | 13 | 1,347,154 |
+
+Those fit a line to within 1,092 gas: **a Groth16 verification on Monad costs about 940,500
+gas plus 31,300 per public signal.** The root cause is measurable directly — `ecPairing`
+marginal cost is 172,124 gas per pair against 34,000 under EIP-1108, so **Monad prices the
+BN254 precompiles at roughly 5× the Ethereum schedule**, which is the entire gap between the
+~264k a disclosure verification measures locally in Foundry and what it costs here.
+
+That law prices every ceiling:
+
+- **Merkle depth is free.** Depth is a private-witness dimension: depth 20 gives a million
+  leaves and verifies at exactly the same price, with only proving time roughly doubling.
+  The 1,024-leaf ceiling is a rebuild, not an economic wall.
+- **The aggregate costs ~62,600 gas per extra position** — a commitment and its active flag
+  are two signals each. Against a 150M block that bounds a single aggregate proof at
+  roughly 2,300 positions, which is the real argument for recursion rather than a wider
+  circuit.
+- **A deposit verifies two proofs**, 11 signals and 3, for about 2.3M gas before the two
+  live `complianceVerify` calls and storage.
+
+An earlier version of this section said no on-chain gas number here could be reproduced,
+because Monad charges the submitted limit and reports it back as `gasUsed`. The receipts are
+indeed useless; the conclusion drawn from them was wrong, and a judge who reached for
+`eth_estimateGas` would have found that out before we did.
+
+Proving runs 610–1,727 ms client-side, recorded per row in `audit-log.json`. The aggregate
+circuit is fixed at **5 slots**, so it already cannot span a register of eight commitments —
+the auditor enumerates the four live positions and the tool *refuses* rather than answering
+over a subset.
+
 
 ## Related work
 

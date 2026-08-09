@@ -79,15 +79,17 @@ console.log(`chain      ${CHAIN}`);
 console.log(`a-token    ${ATOKEN}  ${dep.atokenSymbol ?? ""}`);
 console.log(`pool       ${dep.pool ?? "—"}`);
 
-const { rules = [] } = await cv.atokenRules(CHAIN, ATOKEN);
+// Posture, not rules: an empty rule set is only meaningful once the token is known to
+// exist, and atoken/rules alone cannot establish that.
+const { rules = [], paused } = await cv.atokenPosture(CHAIN, ATOKEN);
 for (const [i, r] of rules.entries()) {
   console.log(`rule[${i}]    min_tier ${r.min_tier}  min_sub_tier ${r.min_sub_tier}` +
     `  group ${r.allowed_group || "*"}  sub_group ${r.allowed_sub_group || "*"}` +
     `  countries ${r.countries?.length ? r.countries.join(",") : "*"}${r.is_black_list ? " (BLOCKED)" : ""}`);
 }
+// Safe to say now: atokenPosture proved the token exists before reporting its rules, so
+// an empty set means "admits every A-Pass holder" rather than "no such asset".
 if (!rules.length) console.log("rule[?]    none — the A-Token admits every A-Pass holder");
-
-const { paused } = await cv.atokenIsPaused(CHAIN, ATOKEN);
 console.log(`paused     ${paused}${paused ? "   — every transfer of this asset is halted" : ""}`);
 
 // ---- the sweep ----------------------------------------------------------

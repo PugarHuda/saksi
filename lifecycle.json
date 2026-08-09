@@ -1,0 +1,46 @@
+{
+  "chain": "monad",
+  "pool": "0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA",
+  "asset": "0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B",
+  "builtAt": "2026-08-09T12:56:21.266Z",
+  "steps": [
+    {
+      "step": "enters",
+      "tx": "0xdc0da65b298d7e224528e365b4ee960d7fea0676dde495a74f1b323f88a0cecd",
+      "title": "The position enters, in public",
+      "body": "A deposit takes a plaintext amount from a visible sender, and both are emitted. Anyone reading this transaction knows a position of 250 was opened, and by whom. The register does not pretend otherwise: what a commitment protects is everything after this moment, not this moment.",
+      "shows": "250 SAKSIAZEV, sender visible",
+      "block": 52207987,
+      "from": "0x4490CcB0abdE3D2E494dE5cC118F7D0D74b44639"
+    },
+    {
+      "step": "moves",
+      "tx": "0x30a74be85a99b68c4bd0a40a1beb7575b0b06686ed610993ed7f6aa38a8cac68",
+      "title": "It moves, and the link breaks",
+      "body": "A JoinSplit spends this position and one other, and creates two new ones. What the chain records is two nullifiers and two commitments. Nothing on it says which input became which output, or what either is worth. The 250 that entered is gone as a traceable object.",
+      "shows": "2 nullifiers published, 2 commitments inserted, nothing withdrawn",
+      "block": 52209800,
+      "from": "0x4490CcB0abdE3D2E494dE5cC118F7D0D74b44639"
+    },
+    {
+      "step": "answers",
+      "tx": "0x6ad3c3dde01890d6216b551ad4872ce52c638ab9d3c15dab9ebed72dc0e961b2",
+      "requestTx": "0x3473c785df46af58e99144b4a171bf9ec3b66eba4b431dc7bd9fc27974551edf",
+      "title": "It becomes readable — because someone asked",
+      "body": "The auditor posted a question on-chain. Ten blocks later a proof answered exactly that question and 459.9 became public. That is the only route by which a figure leaves this register, and the chain records that the question came first. The register cannot be made to volunteer it.",
+      "shows": "459.9 SAKSIAZEV, in answer to a request posted first",
+      "block": 52210355,
+      "from": "0x4490CcB0abdE3D2E494dE5cC118F7D0D74b44639",
+      "requestBlock": 52210345
+    },
+    {
+      "step": "leaves",
+      "tx": "0x08b6801b1cbcaa681f2a81d77628e4c88dcec9bf70793492663fa605422d0e3a",
+      "title": "It leaves under the rules it entered by",
+      "body": "A second JoinSplit redeems 50 out of the register: 49.5 to the recipient and 0.5 to the relayer that carried the transaction. Both are checked against Cleanverse's validator by the contract, because their model holds that every address receiving a CVA needs a credential. The exit is a compliance event, not an escape from one.",
+      "shows": "50 out — 49.5 to a credentialed recipient, 0.5 to a credentialed relayer",
+      "block": 52220592,
+      "from": "0x4490CcB0abdE3D2E494dE5cC118F7D0D74b44639"
+    }
+  ]
+}

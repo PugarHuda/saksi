@@ -136,6 +136,9 @@ contract SaksiPool is Ownable {
     /// The contract has to know the number the circuits were compiled with, because nothing
     /// else in the system does.
     uint256 public constant TREE_CAPACITY = 1 << 10;
+    /// Leaves a single exit consumes. The transfer circuit is 2-in/2-out with no 0-out
+    /// variant, so even a full withdrawal inserts two change commitments.
+    uint256 public constant EXIT_LEAVES = 2;
     uint256 public constant AGG_SLOTS = 5;
 
     IERC20 public immutable asset;              // the CVA this register tracks
@@ -195,12 +198,29 @@ contract SaksiPool is Ownable {
     uint8 public constant KIND_AGGREGATE = 4;
 
     event Deposited(bytes32 indexed commitment, uint256 amount, address indexed from, uint256 leafIndex);
-    event Transacted(bytes32 indexed nullifierA, bytes32 indexed nullifierB, uint256 withdrawn, address to);
+    event Transacted(
+        bytes32 indexed nullifierA,
+        bytes32 indexed nullifierB,
+        uint256 withdrawn,
+        address to,
+        address relayer,
+        uint256 fee
+    );
     event CommitmentInserted(bytes32 indexed commitment, uint256 leafIndex);
     event RootRotated(uint256 indexed previousRoot, uint256 indexed newRoot);
     event RootRetired(uint256 indexed root);
     event NoteRootPublished(uint256 indexed previousRoot, uint256 indexed newRoot);
+    /// Distinct from NoteRootPublished on purpose. Both used to emit (previous, current),
+    /// which for a realistic sequence is byte-identical — same signature, same two indexed
+    /// topics, empty data — so a log reader could not distinguish advancing the root from
+    /// revoking one. The association set has always had this twin; the note tree did not.
+    event NoteRootRetired(uint256 indexed root, uint256 indexed currentRoot);
     event DenyListSet(uint256[DENY_SLOTS] denyList);
+    /// Perimeter changes forwarded to Cleanverse. They emit on their contract, not ours,
+    /// so without these the register's own governance is invisible in its own log.
+    event RuleSet(uint8 minTier, uint8 minSubTier, bool isBlackList, uint256 countryBitmap);
+    event RuleAdded(uint8 minTier, uint8 minSubTier, bool isBlackList, uint256 countryBitmap);
+    event RuleRemoved(uint256 index);
     event AuditRequested(
         uint256 indexed contextHash,
         address indexed by,
@@ -212,6 +232,9 @@ contract SaksiPool is Ownable {
     event DisclosureProved(uint256 indexed contextHash, uint8 kind, uint256 a, uint256 b);
     event PausedSet(bool paused);
     event AuditorSet(address indexed auditor);
+    /// The opening perimeter. Without it an indexer starting at the deploy block cannot
+    /// learn the state every later event is a delta against.
+    event RegisterOpened(address indexed asset, address indexed validator, uint256 aspRoot);
 
     error Paused();
     error UnknownRoot();
@@ -262,6 +285,7 @@ contract SaksiPool is Ownable {
         aggregateVerifier = IVerifier13(_aggregateVerifier);
         aspRoot = _aspRoot;
         knownRoot[_aspRoot] = true;
+        emit RegisterOpened(_asset, _validator, _aspRoot);
         auditor = _owner;
     }
 
@@ -271,6 +295,52 @@ contract SaksiPool is Ownable {
 
     /// The key a depositor must prove membership for. Derived from the caller's
     /// address, so a valid proof for one wallet is useless from another.
+    // ---- ERC-3643 compatibility --------------------------------------------
+    //
+    // T-REX expresses compliance as two questions: is this identity verified, and may this
+    // transfer proceed. The standard carries most of the tokenized-RWA supply in existence,
+    // so answering in its shape means an existing integration can query this register
+    // without knowing anything about it.
+    //
+    // Adopted deliberately and stated honestly: this is the ADMISSION predicate, not the
+    // shielded ledger. It answers about addresses, which is what ERC-3643 asks about — the
+    // positions inside this register are commitments and no standard has a question for
+    // them yet. `canTransfer` is what the pool WOULD enforce at its edges; the movement in
+    // the middle is proved, not asked about.
+
+    /// ERC-3643 IIdentityRegistry.isVerified — the same predicate `deposit` enforces at
+    /// gate one, in the standard's spelling.
+    function isVerified(address who) external view returns (bool) {
+        return _eligible(who) && !_denied(who);
+    }
+
+    /// ERC-3643 ICompliance.canTransfer. Both edges must be credentialed and neither may be
+    /// sanctioned, and the register must be able to back the amount — which is the same
+    /// pair of checks `transact` makes on a withdrawal, asked in advance.
+    function canTransfer(address from, address to, uint256 amount) external view returns (bool) {
+        if (paused) return false;
+        if (!_eligible(from) || !_eligible(to)) return false;
+        if (_denied(from) || _denied(to)) return false;
+        return amount <= asset.balanceOf(address(this));
+    }
+
+    /// True when the leaf this contract derives for `who` sits on the sanctions list. The
+    /// list holds leaves rather than addresses, which is what the entry circuit proves
+    /// non-membership of.
+    function _denied(address who) internal view returns (bool) {
+        uint256 key = sourceKeyOf(who);
+        for (uint256 i = 0; i < DENY_SLOTS; i++) if (denyList[i] != 0 && denyList[i] == key) return true;
+        return false;
+    }
+
+    /// Cleanverse's answer, or false where their contract will not answer at all. The
+    /// internal form exists because the ERC-3643 views must not revert: a standard
+    /// predicate that throws is worse than one that says no.
+    function _eligible(address who) internal view returns (bool) {
+        try validator.complianceVerify(address(this), who) returns (bool ok) { return ok; }
+        catch { return false; }
+    }
+
     function sourceKeyOf(address who) public pure returns (uint256) {
         return uint256(keccak256(abi.encodePacked(who))) % FIELD;
     }
@@ -306,16 +376,19 @@ contract SaksiPool is Ownable {
     /// through its own governance, and Cleanverse enforces the result.
     function setRule(IAPassComplianceValidator.RuleV2 calldata r) external onlyOwner {
         validator.setRuleV2FromContract(r);
+        emit RuleSet(r.minTier, r.minSubTier, r.isBlackList, r.countryBitmap);
     }
 
     /// Append a rule. Rules are OR-ed, so this widens admission — a second lawful path
     /// in, such as a jurisdiction carve-out.
     function addRule(IAPassComplianceValidator.RuleV2 calldata r) external onlyOwner {
         validator.addRuleV2FromContract(r);
+        emit RuleAdded(r.minTier, r.minSubTier, r.isBlackList, r.countryBitmap);
     }
 
     function removeRule(uint256 index) external onlyOwner {
         validator.removeRuleV2FromContract(index);
+        emit RuleRemoved(index);
     }
 
     /// The value the transfer proof's extDataHash must carry. Binding the recipient
@@ -357,7 +430,7 @@ contract SaksiPool is Ownable {
         // Leaving noteRoot pointing at a root transact() now refuses would have the
         // console advertising a root the register will not accept.
         if (root == noteRoot) noteRoot = 0;
-        emit NoteRootPublished(root, noteRoot);
+        emit NoteRootRetired(root, noteRoot);
     }
 
     function setDenyList(uint256[DENY_SLOTS] calldata list) external onlyOwner {
@@ -413,7 +486,13 @@ contract SaksiPool is Ownable {
         // Past capacity the note tree cannot produce a witness for the new leaf, so the
         // position would be permanently unspendable. Checked first: it costs one SLOAD and
         // refusing here saves the caller two Groth16 verifications they cannot use.
-        if (commitments.length + 1 > TREE_CAPACITY) revert TreeFull();
+        //
+        // An entry reserves the room its own exit will need. The transfer circuit is fixed
+        // 2-out, so leaving the register always costs two leaves even when nothing is kept —
+        // which means a naive `+1` guard accepts a deposit at 1023 and then can never pay it
+        // out. Requiring headroom for one exit is what stops the register becoming a valve
+        // that only turns one way.
+        if (commitments.length + 1 + EXIT_LEAVES > TREE_CAPACITY) revert TreeFull();
         if (uint256(commitment) >= FIELD) revert CommitmentNotBound();
 
         // GATE ONE — Cleanverse's Validator, on their contract, against this wallet's
@@ -547,7 +626,7 @@ contract SaksiPool is Ownable {
             require(asset.transfer(recipient, withdrawn - fee), "transfer failed");
             if (fee != 0) require(asset.transfer(relayer, fee), "fee transfer failed");
         }
-        emit Transacted(nA, nB, withdrawn, recipient);
+        emit Transacted(nA, nB, withdrawn, recipient, relayer, fee);
     }
 
     // ---- answerability -----------------------------------------------------

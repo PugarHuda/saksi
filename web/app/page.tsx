@@ -80,12 +80,13 @@ export default function Landing() {
             </span>
             {/* One noun phrase, cut by its own italic. "Keeps" carries both senses — the
                 register maintains its positions and it keeps them to itself. */}
+            {/* .cap is a block, and so is the em — the <br>s that used to separate them
+                added an empty line box between "that keeps" and "ITS POSITIONS", and left
+                the tracking correction in .cap unapplied because nothing carried the class. */}
             <h1 className="display">
-              THE HOLDER REGISTER
-              <br />
+              <span className="cap">THE HOLDER REGISTER</span>
               <em>that keeps</em>
-              <br />
-              ITS POSITIONS
+              <span className="cap">ITS POSITIONS</span>
             </h1>
             <p className="display-sub">
               A confidential holder register for tokenized real-world assets. Entry is gated
@@ -277,7 +278,9 @@ export default function Landing() {
             <Row label={`Asset (${dep.assetSymbol ?? "CVA"})`} value={dep.asset} explorer />
             <Row label="Cleanverse CVI Validator" value={dep.validator} explorer />
             <Row label="Association set" value={`${dep.aspAdmitted ?? "—"} members admitted`} />
-            <Row label="Shielded positions" value={`${positions.length}`} />
+            {/* Not "shielded positions": the console reads commitmentCount() live, which
+                counts JoinSplit outputs too, so the same label carried two numbers. */}
+            <Row label="Entries recorded" value={`${positions.length}`} />
           </dl>
           <p className="cta">
             <Link href="/console" className="btn primary">

@@ -119,6 +119,11 @@ export class Cleanverse {
    *  Verified against the sandbox on 2026-08-09. This normalises all four into the
    *  documented shape, and still throws for failures that are not verdicts. */
   async verifyApass(chain, atoken, address) {
+    // A malformed address comes back as verdict 2, "apass not exist" — which reads as a
+    // compliance refusal about a wallet that was never asked about. Refuse it here.
+    if (!/^0x[0-9a-fA-F]{40}$/.test(address ?? "")) {
+      throw new Error(`verify_apass: ${address} is not a 20-byte address`);
+    }
     try {
       return await this.post("verify_apass", { chain, atoken, address });
     } catch (e) {
@@ -190,6 +195,23 @@ export class Cleanverse {
   // take the former, and the wrong name returns HTTP 500 — invisible until post() started
   // reporting the status, because a 500 body carries no `code`.
   atokenRules(chain, atoken_address) { return this.post("atoken/rules", { chain, atoken_address }); }
+
+  /** The A-Token's posture, and the ONLY safe way to read its rules.
+   *
+   *  atoken/rules answers `0000` with `rules: []` for any address at all — a mistyped
+   *  A-Token, a wrong chain, a token whose issuance failed. It cannot distinguish "this
+   *  asset carries no rules" from "there is no such asset", and the caller that reads the
+   *  empty array prints the most permissive compliance claim available: this asset admits
+   *  everyone. A missing token rendered as an open door.
+   *
+   *  atoken/is_paused CAN tell the difference — it returns 12017 for an address with no
+   *  ISSUED application row — so existence is proved first and the rule set is only
+   *  reported about a token that demonstrably exists. */
+  async atokenPosture(chain, atoken_address) {
+    const { paused } = await this.atokenIsPaused(chain, atoken_address);
+    const { rules = [] } = await this.atokenRules(chain, atoken_address);
+    return { paused, rules };
+  }
 
   addAtokenRule(chain, atoken_address, rule) {
     return this.post("atoken/add_rule", { chain, atoken_address, rule });
