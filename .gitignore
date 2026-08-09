@@ -51,3 +51,11 @@ notes.*.json
 # Playwright run output, not source.
 web/test-results/
 web/playwright-report/
+
+.vercel
+
+# Video work: node_modules and rendered output. 300MB+ and regenerable.
+video*/node_modules/
+video*/out/
+video*/capture/
+video*/.remotion/
