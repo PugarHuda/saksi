@@ -1,0 +1,12 @@
+.env
+.env.local
+# Demo wallet private keys. Testnet-only, but a repo is the wrong place for a key.
+wallets.json
+node_modules/
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+web/.next/
+web/node_modules/
+web/out/
+*.wtns
