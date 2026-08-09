@@ -146,9 +146,9 @@ was at most 1,000 when it was in fact 1,680, **no proof could be produced**, and
 
 **2. The set is faithful, and we can now prove it over the whole population.**
 `node ops/gate-gap.mjs` asks Cleanverse's validator about **every member of the set**, not a
-sample, and reports the direction of any disagreement. Every member is admitted by
-Cleanverse too — which is the only acceptable result, because the set is *derived* from
-their registry and must never be more permissive than it.
+sample, and reports the direction of any disagreement. **524 of 524 are admitted by
+Cleanverse too** — the only acceptable result, because the set is *derived* from their
+registry and must never be more permissive than it.
 
 It was more permissive, earlier today. Fifteen credentials Cleanverse had **frozen** were
 holding valid membership witnesses in our set, because removing a broken server-side status

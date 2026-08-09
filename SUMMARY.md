@@ -51,7 +51,11 @@ posts a question on-chain and waits for a proof that answers exactly it.
    `min_tier 30` rule from issuance. `activeRules()` on our pool and `getRulesV2()` on
    theirs return the identical `(0x0000, 0x0000, 30, 0, false, 0)`.
 3. **The association set is derived from live CVI.** 524 members admitted from a population
-   of 602, rebuilt from A-Pass state on every run, root anchored on-chain.
+   of 602, rebuilt from A-Pass state on every run, root anchored on-chain. `ops/gate-gap.mjs`
+   asks the validator about **every one of the 524** — all are admitted by Cleanverse too,
+   which is the only acceptable answer: a set derived from their registry must never be more
+   permissive than it. Earlier today fifteen frozen credentials were in it and the check was
+   sampling four addresses.
 4. **Revocation is a rebuild, not a blacklist.** Freeze an A-Pass and the next set is built
    without it; the holder can no longer produce an entry proof.
 5. **A third, independent control.** The entry circuit also proves non-membership of an
