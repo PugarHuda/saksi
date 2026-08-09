@@ -1107,15 +1107,18 @@ contract Audit4Test is Test {
         }
         assertTrue(sawRequest);
 
-        // DisclosureProved(ctx, kind, a, b) — for THRESHOLD, a is the commitment and b the
+        // DisclosureProved(ctx, kind, subject, a, b) — for THRESHOLD, a is the commitment and b the
         // figure. The meaning of a and b is kind-dependent, which a previous pass recorded;
         // what matters here is that nothing is MISSING for this kind.
-        bytes32 provedSig = keccak256("DisclosureProved(uint256,uint8,uint256,uint256)");
+        bytes32 provedSig = keccak256("DisclosureProved(uint256,uint8,uint256,uint256,uint256)");
         bool sawProof;
         for (uint256 i = 0; i < logs.length; i++) {
             if (logs[i].topics[0] != provedSig) continue;
             sawProof = true;
-            (uint8 kind, uint256 a, uint256 b) = abi.decode(logs[i].data, (uint8, uint256, uint256));
+            // subject is carried explicitly now, so the range path names what it disclosed about
+            (uint8 kind, uint256 subject, uint256 a, uint256 b) =
+                abi.decode(logs[i].data, (uint8, uint256, uint256, uint256));
+            assertEq(subject, 1430, "every disclosure names its subject, including range");
             assertEq(kind, THR);
             assertEq(a, 1430, "the subject");
             assertEq(b, 1_000e6, "the figure proved");

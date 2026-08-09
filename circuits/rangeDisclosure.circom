@@ -18,6 +18,10 @@ include "circomlib/circuits/poseidon.circom";
 include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/bitify.circom";
 
+// THE BAND IS PROVER-CHOSEN. Both bounds are free public inputs, so `0 .. 2^64-1` always
+// has a witness. As with the threshold circuit, the figure only means something because
+// SaksiPool.claimHash pins it before an answer exists.
+
 template RangeDisclosure() {
     // ---- PUBLIC INPUTS ----
     signal input commitment;          // the on-chain confidential commitment

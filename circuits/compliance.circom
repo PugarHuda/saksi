@@ -32,6 +32,10 @@ include "circomlib/circuits/bitify.circom";
 include "circomlib/circuits/comparators.circom";
 include "./lib/merkleProof.circom";
 
+// levels = 10 caps the association set at 1024 members. 524 are admitted today, so the
+// ceiling is half consumed, and ops/asp.mjs refuses to build past it rather than silently
+// returning the root of a subtree.
+
 template Compliance(levels, nDeny) {
     // ---- PUBLIC ----
     signal input aspRoot;            // allow-list Merkle root

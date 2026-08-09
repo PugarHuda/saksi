@@ -229,7 +229,18 @@ contract SaksiPool is Ownable {
         bytes32 claim,
         string question
     );
-    event DisclosureProved(uint256 indexed contextHash, uint8 kind, uint256 a, uint256 b);
+    /// `a` and `b` mean different things per kind — the figure for exact, the cap for a
+    /// threshold, the two bounds for a range, the cap and nonce for an aggregate — so an
+    /// indexer must switch on `kind`. `subject` is carried explicitly because the range
+    /// path spends both slots on its bounds and would otherwise be the one disclosure whose
+    /// event never says what it was about.
+    event DisclosureProved(
+        uint256 indexed contextHash,
+        uint8 kind,
+        uint256 subject,
+        uint256 a,
+        uint256 b
+    );
     event PausedSet(bool paused);
     event AuditorSet(address indexed auditor);
     /// The opening perimeter. Without it an indexer starting at the deploy block cannot
@@ -752,7 +763,7 @@ contract SaksiPool is Ownable {
         _requireKnown(s[0]);
         if (!exactVerifier.verifyProof(pA, pB, pC, s)) revert InvalidProof();
         auditAnswered[s[2]] = KIND_EXACT;
-        emit DisclosureProved(s[2], KIND_EXACT, s[0], s[1]);
+        emit DisclosureProved(s[2], KIND_EXACT, s[0], s[0], s[1]);
     }
 
     /// Threshold disclosure: [commitment, threshold, auditContextHash].
@@ -765,7 +776,7 @@ contract SaksiPool is Ownable {
         _requireKnown(s[0]);
         if (!thresholdVerifier.verifyProof(pA, pB, pC, s)) revert InvalidProof();
         auditAnswered[s[2]] = KIND_THRESHOLD;
-        emit DisclosureProved(s[2], KIND_THRESHOLD, s[0], s[1]);
+        emit DisclosureProved(s[2], KIND_THRESHOLD, s[0], s[0], s[1]);
     }
 
     /// Two-sided range: [commitment, lower, upper, auditContextHash].
@@ -777,7 +788,7 @@ contract SaksiPool is Ownable {
         _requireKnown(s[0]);
         if (!rangeVerifier.verifyProof(pA, pB, pC, s)) revert InvalidProof();
         auditAnswered[s[3]] = KIND_RANGE;
-        emit DisclosureProved(s[3], KIND_RANGE, s[1], s[2]);
+        emit DisclosureProved(s[3], KIND_RANGE, s[0], s[1], s[2]);
     }
 
     /// Aggregate: [commitments[5], active[5], cap, auditContextHash, ctxNonce].
@@ -797,7 +808,7 @@ contract SaksiPool is Ownable {
         }
         if (!aggregateVerifier.verifyProof(pA, pB, pC, s)) revert InvalidProof();
         auditAnswered[s[11]] = KIND_AGGREGATE;
-        emit DisclosureProved(s[11], KIND_AGGREGATE, s[10], s[12]);
+        emit DisclosureProved(s[11], KIND_AGGREGATE, 0, s[10], s[12]);
     }
 
     // ---- views ------------------------------------------------------------

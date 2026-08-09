@@ -149,7 +149,13 @@ template Transfer(levels, nIns, nOuts) {
     noRealInput.in <== realInputs;
     noRealInput.out === 0;
 
-    // value conservation
+    // Value conservation, and the reason it is wrap-free.
+    //
+    // publicAmount is NOT range-checked here. The identity holds over the integers anyway:
+    // outputs and inputs are Num2Bits(248)-bounded above, so both sums stay under 2^249,
+    // and `transact` forces a withdrawal to satisfy `withdrawn <= balanceOf(this)`. A wrap
+    // would need sumOut near 2^253, which those bounds forbid. Widening the 248 to 253
+    // would silently break this — the margin is the proof.
     sumIn + publicAmount === sumOut;
 
     // bind external data (cannot be malleated)

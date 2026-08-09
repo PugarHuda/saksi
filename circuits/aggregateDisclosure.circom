@@ -15,7 +15,10 @@ pragma circom 2.1.6;
 //     commitment[i] = Poseidon(amount[i], pubKey[i], blinding[i])   (same as deposit)
 //     proven fact  : sum over active[i]=1 of amount[i]  <=  cap      (each amount hidden)
 //
-// Public  inputs : commitments[N], active[N], cap, auditContextHash
+// Public  inputs : commitments[N], active[N], cap, auditContextHash, ctxNonce
+//                  (13 signals at N=5. The nonce is public too and was missing from this
+//                  list — an integrator sizing the verifier from this comment would be off
+//                  by one and the proof would not decode.)
 // Private inputs : amounts[N], pubKeys[N], blindings[N]
 // -----------------------------------------------------------------------------
 
@@ -80,7 +83,14 @@ template AggregateDisclosure(N) {
     // ISSUES this hash for the full required set (enumerated from the depositor's on-chain
     // deposits). A holder who tries to omit a payment (flip an active flag or swap a commitment)
     // recomputes a DIFFERENT hash than the one issued, so `auditContextHash === ctxHasher.out`
-    // fails and no proof exists. This closes the cherry-picking gap: the report is COMPLETE.
+    // fails and no proof exists. This closes the cherry-picking gap OVER THE DECLARED SET, which is a narrower claim
+//   than it reads. The hash binds every commitment and every flag, so a holder cannot drop
+//   a position from a set the auditor fixed. It says nothing about whether that set was
+//   complete: `cap` is NOT inside the hash, nothing ties a commitment to a holder, and
+//   `_requireKnown` proves deposited rather than unspent — the chain structurally cannot
+//   tell a live position from a retired one, which is the confidentiality this register is
+//   for. Completeness is an assumption about the auditor's enumeration, not a property of
+//   the proof.
     component ctxHasher = Poseidon(2 * N + 1);
     ctxHasher.inputs[0] <== ctxNonce;
     for (var i = 0; i < N; i++) {

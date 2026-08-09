@@ -21,6 +21,12 @@ include "circomlib/circuits/poseidon.circom";
 include "circomlib/circuits/comparators.circom";
 include "circomlib/circuits/bitify.circom";
 
+// THE THRESHOLD IS PROVER-CHOSEN. It is a free public input, range-checked to 64 bits, so
+// `threshold = 2^64-1` always has a witness and a proof of it is perfectly valid. On its own
+// this circuit therefore proves almost nothing. What makes an answer mean anything is
+// SaksiPool.claimHash, which pins the figure the auditor asked about before any answer
+// exists — the binding is in Solidity, not here.
+
 template ThresholdDisclosure() {
     // ---- PUBLIC INPUTS ----
     signal input commitment;          // the on-chain confidential commitment
