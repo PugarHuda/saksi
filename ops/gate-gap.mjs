@@ -31,7 +31,14 @@ import { execFileSync } from "node:child_process";
 import { ROOT, RPC, readDeployment } from "./env.mjs";
 
 const dep = readDeployment();
-const asp = JSON.parse(fs.readFileSync(path.join(ROOT, "asp.json"), "utf8"));
+const aspPath = ["asp.json", "asp.public.json"]
+  .map((f) => path.join(ROOT, f))
+  .find((p) => fs.existsSync(p));
+if (!aspPath) {
+  console.error("no association set on disk — run `node ops/asp.mjs build` first.");
+  process.exit(1);
+}
+const asp = JSON.parse(fs.readFileSync(aspPath, "utf8"));
 const wallets = fs.existsSync(path.join(ROOT, "wallets.json"))
   ? JSON.parse(fs.readFileSync(path.join(ROOT, "wallets.json"), "utf8"))
   : [];
@@ -43,8 +50,10 @@ const CAST = fs.existsSync(path.join(process.env.USERPROFILE ?? "", ".foundry", 
 const call = (to, sig, ...args) =>
   execFileSync(CAST, ["call", to, sig, ...args, "--rpc-url", RPC], { encoding: "utf8" }).trim();
 
+// The published set reduces members this project does not operate to leaves, so a wallet
+// is optional here — and membership is a property of the leaf in any case.
 const inSet = (addr) =>
-  asp.members.some((m) => m.wallet.toLowerCase() === addr.toLowerCase());
+  asp.members.some((m) => m.wallet && m.wallet.toLowerCase() === addr.toLowerCase());
 
 // The set as it stood before the last rebuild. Between a credential changing and the root
 // rotating, this is what the pool was still accepting proofs against — the window the live
@@ -52,7 +61,7 @@ const inSet = (addr) =>
 const prevPath = path.join(ROOT, "asp.previous.json");
 const prev = fs.existsSync(prevPath) ? JSON.parse(fs.readFileSync(prevPath, "utf8")) : null;
 const inPrevSet = (addr) =>
-  !!prev && prev.members.some((m) => m.wallet.toLowerCase() === addr.toLowerCase());
+  !!prev && prev.members.some((m) => m.wallet && m.wallet.toLowerCase() === addr.toLowerCase());
 
 const label = (addr) =>
   wallets.find((w) => w.address.toLowerCase() === addr.toLowerCase())?.label ?? "";
@@ -155,7 +164,17 @@ async function worker() {
   }
 }
 
-console.log(`\nsweeping all ${members.length} members against Cleanverse's validator…`);
+// Say what is actually being checked. Running from a clone, only the committed public set
+// is available and it carries addresses for the members this project operates — so the
+// sweep covers a dozen, not five hundred, and reporting it as a full sweep would be exactly
+// the over-claim this script already made once.
+const addressable = members.filter((m) => m.wallet).length;
+if (addressable < members.length) {
+  console.log(`\n${members.length - addressable} of ${members.length} members are published as`);
+  console.log("leaves only, so the validator cannot be asked about them from this copy of the");
+  console.log(`set. Sweeping the ${addressable} that carry an address.`);
+}
+console.log(`\nsweeping ${addressable} of ${members.length} members against Cleanverse's validator…`);
 await Promise.all(Array.from({ length: CONC }, worker));
 process.stdout.write(`\r  swept ${members.length}/${members.length}\n\n`);
 

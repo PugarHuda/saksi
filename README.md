@@ -131,7 +131,7 @@ Read the live state yourself:
 
 ```bash
 cast call 0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA "registeredWithValidator()(bool)" --rpc-url https://testnet-rpc.monad.xyz
-cast call 0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA "activeRules()((bytes2,bytes2,uint8,uint8,uint256)[])" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA "activeRules()((bytes2,bytes2,uint8,uint8,bool,uint256)[])" --rpc-url https://testnet-rpc.monad.xyz
 cast call 0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA "isEligible(address)(bool)" 0x4490CcB0abdE3D2E494dE5cC118F7D0D74b44639 --rpc-url https://testnet-rpc.monad.xyz
 ```
 
@@ -213,7 +213,8 @@ docs/          Cleanverse API notes, findings, the business plan.
 # contracts
 cd contracts && forge test          # 64 passed
 
-# ops — needs CV_API_ID / CV_API_KEY and a funded Monad key in .env
+# ops — install once, then set CV_API_ID / CV_API_KEY and a funded Monad key in .env
+npm install
 node ops/smoke.mjs                  # live sandbox check
 node ops/asp.mjs build              # rebuild the association set from live CVI
 node ops/deposit.mjs 250            # prove eligibility, enter the register

@@ -25,7 +25,14 @@ import { sourceKeyOf } from "./asp.mjs";
 import { ROOT, RPC, readDeployment } from "./env.mjs";
 
 const dep = readDeployment();
-const asp = JSON.parse(fs.readFileSync(path.join(ROOT, "asp.json"), "utf8"));
+const aspPath = ["asp.json", "asp.public.json"]
+  .map((f) => path.join(ROOT, f))
+  .find((p) => fs.existsSync(p));
+if (!aspPath) {
+  console.error("no association set on disk — run `node ops/asp.mjs build` first.");
+  process.exit(1);
+}
+const asp = JSON.parse(fs.readFileSync(aspPath, "utf8"));
 // Which holder is entering. The register's whole point is that several PEOPLE hold
 // positions in it, not that one wallet holds several notes, so the depositor has to be
 // selectable:  node ops/deposit.mjs 640 --as fund
@@ -55,7 +62,7 @@ const cast = (args) => execFileSync(CAST, args, { encoding: "utf8" }).trim();
 
 // ---- 1. membership witness -------------------------------------------------
 
-const member = asp.members.find((m) => m.wallet.toLowerCase() === who.toLowerCase());
+const member = asp.members.find((m) => m.wallet && m.wallet.toLowerCase() === who.toLowerCase());
 if (!member) {
   console.error(`${who} is not in the current association set (root ${asp.root}).`);
   console.error("Its A-Pass is frozen, expired, or below the rule — there is no proof to build.");

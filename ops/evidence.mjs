@@ -17,7 +17,14 @@ const dep = readDeployment();
 const md = process.argv.includes("--md");
 const audit = JSON.parse(fs.readFileSync(path.join(ROOT, "audit-log.json"), "utf8"));
 const notes = JSON.parse(fs.readFileSync(path.join(ROOT, "notes.public.json"), "utf8"));
-const asp = JSON.parse(fs.readFileSync(path.join(ROOT, "asp.json"), "utf8"));
+const aspPath = ["asp.json", "asp.public.json"]
+  .map((f) => path.join(ROOT, f))
+  .find((p) => fs.existsSync(p));
+if (!aspPath) {
+  console.error("no association set on disk — run `node ops/asp.mjs build` first.");
+  process.exit(1);
+}
+const asp = JSON.parse(fs.readFileSync(aspPath, "utf8"));
 
 async function rpc(method, params) {
   const r = await fetch(RPC, {

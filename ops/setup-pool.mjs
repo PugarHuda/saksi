@@ -55,7 +55,14 @@ if (!auditor) {
 }
 
 step(5, "anchor the current association-set root");
-const asp = JSON.parse(fs.readFileSync(path.join(ROOT, "asp.json"), "utf8"));
+const aspPath = ["asp.json", "asp.public.json"]
+  .map((f) => path.join(ROOT, f))
+  .find((p) => fs.existsSync(p));
+if (!aspPath) {
+  console.error("no association set on disk — run `node ops/asp.mjs build` first.");
+  process.exit(1);
+}
+const asp = JSON.parse(fs.readFileSync(aspPath, "utf8"));
 const out = cast(["send", pool, "rotateRoot(uint256)", asp.root]);
 console.log(`   root ${asp.root.slice(0, 24)}…  tx ${txOf(out)}`);
 

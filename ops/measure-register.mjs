@@ -93,7 +93,14 @@ const head = Number(await rpc("eth_blockNumber", []));
 // ---- the eligible population -------------------------------------------------
 
 const wallets = new Map(); // address -> label
-const asp = JSON.parse(fs.readFileSync(path.join(ROOT, "asp.json"), "utf8"));
+const aspPath = ["asp.json", "asp.public.json"]
+  .map((f) => path.join(ROOT, f))
+  .find((p) => fs.existsSync(p));
+if (!aspPath) {
+  console.error("no association set on disk — run `node ops/asp.mjs build` first.");
+  process.exit(1);
+}
+const asp = JSON.parse(fs.readFileSync(aspPath, "utf8"));
 for (const m of asp.members) wallets.set(m.wallet.toLowerCase(), m.label ?? "");
 
 // The association set applies our own min_tier rule and an active-status filter, which
