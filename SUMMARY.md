@@ -82,8 +82,18 @@ wallet-bound credential there is no set to prove membership in.
 next set is built without it, `rotateRoot` / `retireRoot` anchor the change. No blacklist
 is maintained.
 
-**6 · CVA is the only asset in and out**, and the exit re-gates the *recipient* through
-Cleanverse before the transfer, because leaving is an edge too.
+Stated precisely, because an audit caught us overstating it: **entry is gated
+cryptographically** — no membership witness exists, so no proof exists, and nothing an
+operator does or forgets can change that. **The exit is gated operationally** — `transact()`
+now calls `complianceVerify` on the spender, but the transfer circuit carries no
+association-set input, so the proof is not bound to `msg.sender` and an eligible party
+could in principle relay a revoked holder's withdrawal. Closing that properly means adding
+the association set to the transfer circuit: a recompile and a new ceremony, not a patch.
+Better to name the asymmetry than let "the position freezes" stand as if both edges were
+equally strong.
+
+**6 · CVA is the only asset in and out**, and both the spender and the recipient are
+re-gated through Cleanverse before the transfer, because leaving is an edge too.
 
 ## Why two gates, demonstrated live
 
@@ -121,11 +131,22 @@ registered on-chain before any answer existed. Request block always precedes ans
 | aggregate | total across 5 positions ≤ 2,000? | 52165119 | 52165128 |
 | **aggregate** | **total across 4 positions ≤ 1,000?** | **52163014** | **never — no proof exists** |
 
-That last row is the one to read. The true total was 1,150. The context hash is a Poseidon
-commitment over the enumerated positions *and* their active flags, and the circuit
-recomputes it — so the holder cannot answer by leaving a position out, and cannot answer
-falsely. **There is no proof, so the request is still open on-chain.** Every other system
-here answers or reverts; this one records that it could not answer.
+That last row is the one to read. The true total exceeded the cap. The context hash is a
+Poseidon commitment over the enumerated positions *and* their active flags, and the circuit
+recomputes it, so a holder who drops a position computes a different hash and no proof
+exists. **There is no proof, so the request stays open on-chain.** Every other system here
+answers or reverts; this one records that it could not answer.
+
+**The precise version of the completeness claim**, because the loose version is a common
+way to be wrong: the circuit guarantees the answer covers *the set the context hash names*.
+That is only worth something if the **auditor** fixed the hash. Our first implementation
+let the prover choose the set and then had the auditor register the prover's own hash —
+which proves the answer matches the declared set and says nothing about whether the set was
+complete. It now reads the required set from the register itself, on-chain, on the
+auditor's side (`allCommitments()`), so the holder is answering a question it did not get
+to shape. If the register holds more positions than the circuit has slots, or contains a
+position this holder cannot open, the tool refuses to answer rather than answering over a
+subset — trimming the set would be precisely the cherry-picking the design exists to stop.
 
 The distinction worth naming: **a log is a claim, a proof is a check.** A compliance
 system that writes its decisions to a ledger asks you to trust the thing doing the
@@ -171,6 +192,25 @@ The seven Circom circuits and their proving keys are prior public work from a So
 build, committed as the first commit under exactly that description. Everything that
 touches Cleanverse — the Solidity pool and its two gates, the association-set builder, the
 four disclosure flows, the deployment, the consoles — is this window.
+
+## What an adversarial audit found, and what we did
+
+We ran the contract through an adversarial review with working proof-of-concept exploits
+rather than shipping it unexamined. Three findings were serious; all three are closed and
+covered by tests.
+
+| Finding | What it allowed | Fix |
+|---|---|---|
+| Commitment not bound to the deposited amount | Transfer one unit, commit to a million, let the JoinSplit carry the forgery out. The register was drainable. | `deposit()` now requires a second Groth16 proof opening the commitment to exactly the amount transferred |
+| `uint256(commitment) % FIELD` is not injective — six `bytes32` share each residue | A position that spends normally but that **no disclosure can ever name**: a silent, free opt-out from the answerability guarantee | commitments must *be* field elements, not merely reduce to one |
+| Audit requests were opaque flags any known commitment could answer | One unit bought the permanent right to close someone else's audit with a vacuous proof about a throwaway note, and to write a false answer into the record | a request names its subject and the kind of answer it accepts; both are enforced |
+
+Also closed: a fee silently pocketed on internal transfers, a withdrawal not bounded by
+the register's actual backing, two identical output commitments inserting the same leaf
+twice, ownership renounceable to the zero address, and a published note root with no undo.
+
+The one finding we did **not** fully close is the exit-gating asymmetry described in
+integration point 5 — it needs a new circuit, and saying so is better than pretending.
 
 ## Honest limits
 

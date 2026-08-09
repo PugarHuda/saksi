@@ -20,3 +20,7 @@ notes.json
 docs/HANDOFF.md
 # Cleanverse's own documentation is access-code gated; not ours to republish.
 docs/docs-cleanverse.txt
+
+# Proof artifacts carry the same opening secrets as notes.json.
+.artifacts/
+contracts/.artifacts/

@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {SaksiPool, IAPassComplianceValidator, Ownable} from "../src/SaksiPool.sol";
 
 /// Stands in for Cleanverse's CVI Compliance Validator. The live contract is called
-/// directly on Monad â€” see ops/validator.mjs and the deployment notes â€” so this only has
+/// directly on Monad Ã¢â‚¬â€ see ops/validator.mjs and the deployment notes Ã¢â‚¬â€ so this only has
 /// to reproduce its decision, not its rule engine.
 contract MockValidator {
     mapping(address => bool) public eligible;
@@ -106,7 +106,7 @@ contract SaksiPoolTest is Test {
     function _bind(bytes32 c, uint256 amount) internal pure returns (uint[3] memory s) {
         s[0] = uint256(c) % FIELD;
         s[1] = amount;
-        s[2] = 0;   // entry binding carries no audit context — nobody asked a question
+        s[2] = 0;   // entry binding carries no audit context â€” nobody asked a question
     }
 
     function _deposit(address who, bytes32 c, uint256 amt) internal {
@@ -185,7 +185,7 @@ contract SaksiPoolTest is Test {
     }
 
     /// The two gates are independent. Holding a live credential is not membership of the
-    /// association set the issuer anchored, and vice versa â€” this is what stops the
+    /// association set the issuer anchored, and vice versa Ã¢â‚¬â€ this is what stops the
     /// register inheriting whichever gate happens to be the weaker one.
     function test_ValidGateOneStillFailsGateTwo() public {
         pool.retireRoot(ROOT);                       // still eligible, no longer in the set
@@ -355,12 +355,18 @@ contract SaksiPoolTest is Test {
     // ---- answerability -----------------------------------------------------
 
     function test_OnlyAuditorRaisesRequest() public {
+        // Read the constant before the prank: an external call would consume it and the
+        // revert would never be reached.
+        uint8 threshold = pool.KIND_THRESHOLD();
+
         vm.prank(address(0xBAD));
         vm.expectRevert(SaksiPool.NotAuditor.selector);
-        pool.requestAudit(77, "concentration cap");
+        pool.requestAudit(77, 1, threshold, "concentration cap");
 
-        pool.requestAudit(77, "concentration cap");
+        pool.requestAudit(77, 1, threshold, "concentration cap");
         assertTrue(pool.auditRequested(77));
+        assertEq(pool.auditSubject(77), 1);
+        assertEq(pool.auditKind(77), threshold);
     }
 
     /// The point of registering the question first: an answer with no question
@@ -375,7 +381,7 @@ contract SaksiPoolTest is Test {
 
     function test_ThresholdDisclosureAnswersAndClosesTheRequest() public {
         _deposit(holder, bytes32(uint256(31)), 50e6);
-        pool.requestAudit(4243, "no holder above 1,000");
+        pool.requestAudit(4243, 31, pool.KIND_THRESHOLD(), "no holder above 1,000");
         uint[3] memory s = [uint256(31), 1_000e6, 4243];
 
         pool.proveThreshold(pA, pB, pC, s);
@@ -388,7 +394,7 @@ contract SaksiPoolTest is Test {
 
     /// A disclosure must be about a position this register actually holds.
     function test_DisclosureAboutUnknownCommitmentRejected() public {
-        pool.requestAudit(4244, "unknown note");
+        pool.requestAudit(4244, 0xDEAD, pool.KIND_THRESHOLD(), "unknown note");
         uint[3] memory s = [uint256(0xDEAD), 1_000e6, 4244];
         vm.expectRevert(SaksiPool.UnknownCommitment.selector);
         pool.proveThreshold(pA, pB, pC, s);
@@ -396,7 +402,7 @@ contract SaksiPoolTest is Test {
 
     function test_RangeDisclosure() public {
         _deposit(holder, bytes32(uint256(32)), 50e6);
-        pool.requestAudit(4245, "reportable bracket");
+        pool.requestAudit(4245, 32, pool.KIND_RANGE(), "reportable bracket");
         uint[4] memory s = [uint256(32), 10e6, 100e6, 4245];
         pool.proveRange(pA, pB, pC, s);
         assertEq(pool.auditAnswered(4245), pool.KIND_RANGE());
@@ -405,7 +411,7 @@ contract SaksiPoolTest is Test {
     function test_AggregateDisclosureChecksActiveSlotsOnly() public {
         _deposit(holder, bytes32(uint256(40)), 10e6);
         _deposit(holder, bytes32(uint256(41)), 20e6);
-        pool.requestAudit(4246, "jurisdiction exposure");
+        pool.requestAudit(4246, 0, pool.KIND_AGGREGATE(), "jurisdiction exposure");
 
         uint[13] memory s;
         s[0] = 40; s[1] = 41; s[2] = 0xBEEF; s[3] = 0; s[4] = 0;   // slot 2 is padding
@@ -420,7 +426,7 @@ contract SaksiPoolTest is Test {
 
     function test_AggregateRejectsActiveSlotNotInRegister() public {
         _deposit(holder, bytes32(uint256(42)), 10e6);
-        pool.requestAudit(4247, "jurisdiction exposure");
+        pool.requestAudit(4247, 0, pool.KIND_AGGREGATE(), "jurisdiction exposure");
 
         uint[13] memory s;
         s[0] = 42; s[1] = 0xBEEF;                 // slot 1 is not a known commitment
@@ -433,10 +439,91 @@ contract SaksiPoolTest is Test {
 
     function test_ExactDisclosure() public {
         _deposit(holder, bytes32(uint256(50)), 25e6);
-        pool.requestAudit(4248, "exact position");
+        pool.requestAudit(4248, 50, pool.KIND_EXACT(), "exact position");
         uint[3] memory s = [uint256(50), 25e6, 4248];
         pool.proveExact(pA, pB, pC, s);
         assertEq(pool.auditAnswered(4248), pool.KIND_EXACT());
+    }
+
+    /// A stranger must not be able to close someone else's audit with an answer about
+    /// their own throwaway note. Before the subject was pinned, one unit bought the
+    /// permanent right to write a false answer into the record.
+    function test_StrangerCannotAnswerSomeoneElsesQuestion() public {
+        _deposit(holder, bytes32(uint256(60)), 50e6);       // the position asked about
+        validator.setEligible(address(0xA77ACC), true);
+        asset.mint(address(0xA77ACC), 1);
+        _deposit(address(0xA77ACC), bytes32(uint256(61)), 1); // the attacker's throwaway
+
+        pool.requestAudit(4250, 60, pool.KIND_THRESHOLD(), "is position 60 under the cap");
+
+        uint[3] memory theirs = [uint256(61), type(uint64).max, 4250];
+        vm.prank(address(0xA77ACC));
+        vm.expectRevert(SaksiPool.WrongSubject.selector);
+        pool.proveThreshold(pA, pB, pC, theirs);
+
+        // The real holder's answer still lands.
+        pool.proveThreshold(pA, pB, pC, [uint256(60), 1_000e6, 4250]);
+        assertEq(pool.auditAnswered(4250), pool.KIND_THRESHOLD());
+    }
+
+    /// An exact-disclosure demand must not be satisfiable by a weaker statement.
+    function test_KindCannotBeDowngraded() public {
+        _deposit(holder, bytes32(uint256(62)), 50e6);
+        pool.requestAudit(4251, 62, pool.KIND_EXACT(), "disclose position 62 in full");
+        vm.expectRevert(SaksiPool.WrongDisclosureKind.selector);
+        pool.proveThreshold(pA, pB, pC, [uint256(62), type(uint64).max, 4251]);
+    }
+
+    /// Six bytes32 values share each field residue. A commitment that is not itself a
+    /// field element enters the register under a key no disclosure can ever name.
+    function test_CommitmentMustBeAFieldElement() public {
+        bytes32 alias_ = bytes32(uint256(70) + FIELD);
+        uint[11] memory p = _pub(holder, bytes32(uint256(70)));
+        vm.prank(holder);
+        vm.expectRevert(SaksiPool.CommitmentNotBound.selector);
+        pool.deposit(10e6, alias_, pA, pB, pC, p, pA, pB, pC, _bind(bytes32(uint256(70)), 10e6));
+    }
+
+    /// The entry binding must not double as an answer to an audit request.
+    function test_EntryBindingCarriesNoAuditContext() public {
+        bytes32 c = bytes32(uint256(71));
+        uint[11] memory p = _pub(holder, c);
+        uint[3] memory withCtx = [uint256(71), 10e6, 4252];   // a context hash it should not carry
+        vm.prank(holder);
+        vm.expectRevert(SaksiPool.CommitmentNotBound.selector);
+        pool.deposit(10e6, c, pA, pB, pC, p, pA, pB, pC, withCtx);
+    }
+
+    /// A revoked holder keeps the note but loses the ability to move it through this
+    /// contract. The exit is a live check rather than a circuit constraint — see the note
+    /// in transact() — but leaving it unchecked made "the position freezes" simply false.
+    function test_RevokedHolderCannotWithdraw() public {
+        _deposit(holder, bytes32(uint256(80)), 100e6);
+        validator.setEligible(holder, false);               // credential withdrawn
+        uint[7] memory s = _transferSignals(100e6, holder, 20);
+        vm.prank(holder);
+        vm.expectRevert(abi.encodeWithSelector(SaksiPool.ValidatorRefused.selector, holder));
+        pool.transact(pA, pB, pC, s, holder, address(0), 0);
+    }
+
+    function test_CannotWithdrawMoreThanTheRegisterHolds() public {
+        _deposit(holder, bytes32(uint256(81)), 10e6);
+        uint[7] memory s = _transferSignals(999e6, holder, 21);
+        vm.expectRevert(SaksiPool.ExceedsBacking.selector);
+        pool.transact(pA, pB, pC, s, holder, address(0), 0);
+    }
+
+    function test_FeeOnAnInternalTransferIsRefused() public {
+        _deposit(holder, bytes32(uint256(82)), 10e6);
+        uint[7] memory s = _transferSignals(0, holder, 22);
+        s[2] = pool.extDataHashOf(holder, owner, 5e6);
+        vm.expectRevert(SaksiPool.FeeWithoutWithdrawal.selector);
+        pool.transact(pA, pB, pC, s, holder, owner, 5e6);
+    }
+
+    function test_OwnershipCannotBeRenouncedToZero() public {
+        vm.expectRevert(Ownable.ZeroOwner.selector);
+        pool.transferOwnership(address(0));
     }
 
     /// validator/register checks the EIP-191 signature against this.

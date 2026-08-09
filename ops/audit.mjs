@@ -14,7 +14,7 @@
 //
 // The aggregate case is the strict one. Its context hash is Poseidon over the ctxNonce,
 // the enumerated commitments and their active flags, and the circuit checks that hash
-// itself — so a holder cannot quietly drop a position from the total. The report is
+// itself â€” so a holder cannot quietly drop a position from the total. The report is
 // complete or there is no proof.
 
 import "./env.mjs";
@@ -61,31 +61,42 @@ const build = (name) => ({
   vkey: JSON.parse(fs.readFileSync(path.join(ROOT, `circuits/build/${name}_vk.json`), "utf8")),
 });
 
-async function proveAndSend({ circuit, input, selector, sig, question, ctx, kind, answer }) {
+/// Must match SaksiPool's DisclosureKind constants.
+const KIND = { exact: 1, threshold: 2, range: 3, aggregate: 4 };
+
+async function proveAndSend({ circuit, input, selector, sig, question, ctx, kind, answer, subject }) {
   const { wasm, zkey, vkey } = build(circuit);
 
+  // The request names the position and the kind of answer it will accept. Without both,
+  // any known commitment could close any request â€” one unit buys the permanent right to
+  // write a false answer into the record, and an exact-disclosure demand can be satisfied
+  // with a vacuous threshold statement.
   console.log(`\nregulator registers the question on-chain first`);
-  const req = send([dep.pool, "requestAudit(uint256,string)", ctx.toString(), question], auditorPk);
+  const req = send(
+    [dep.pool, "requestAudit(uint256,uint256,uint8,string)",
+      ctx.toString(), (subject ?? 0n).toString(), String(KIND[kind]), question],
+    auditorPk,
+  );
   console.log(
     `  requestAudit  ${req.ok ? "ok" : "FAILED"}  ${req.tx}` +
     (auditorPk === pk ? "   (WARNING: signed by the issuer's own key)" : "   signed by the auditor"),
   );
 
-  console.log(`proving (${circuit})…`);
+  console.log(`proving (${circuit})â€¦`);
   const t0 = Date.now();
   let proof, publicSignals;
   try {
     ({ proof, publicSignals } = await snarkjs.groth16.fullProve(input, wasm, zkey));
   } catch (e) {
     // A cap that actually binds has no witness. The register cannot answer "yes" to a
-    // question whose answer is no — there is no proof to produce, so the request stays
+    // question whose answer is no â€” there is no proof to produce, so the request stays
     // open on-chain and the failure is the honest outcome rather than an error.
     const ms = Date.now() - t0;
-    console.log(`  NO PROOF EXISTS — the claim is false (${(e.message ?? "").split("\n")[0]})`);
+    console.log(`  NO PROOF EXISTS â€” the claim is false (${(e.message ?? "").split("\n")[0]})`);
     appendLog({
       kind, question, circuit,
       contextHash: ctx.toString(),
-      answer: "no — no proof exists for this claim, so the request stays open",
+      answer: "no â€” no proof exists for this claim, so the request stays open",
       requestTx: req.tx,
       verifyTx: null,
       verified: false,
@@ -105,7 +116,7 @@ async function proveAndSend({ circuit, input, selector, sig, question, ctx, kind
   const fmt = (x) => `[${x.join(",")}]`;
   const fmt2 = (x) => `[[${x[0].join(",")}],[${x[1].join(",")}]]`;
 
-  console.log(`submitting to the contract…`);
+  console.log(`submitting to the contractâ€¦`);
   const res = send([dep.pool, sig, fmt(pA), fmt2(pB), fmt(pC), fmt(pub)]);
   console.log(`  ${selector}  ${res.ok ? "VERIFIED ON-CHAIN" : "REFUSED"}  ${res.tx}`);
   if (!res.ok) console.log(res.out.slice(0, 600));
@@ -124,7 +135,7 @@ async function proveAndSend({ circuit, input, selector, sig, question, ctx, kind
 }
 
 const notes = loadNotes();
-if (!notes.length) { console.error("no positions in notes.json — run ops/deposit.mjs first"); process.exit(1); }
+if (!notes.length) { console.error("no positions in notes.json â€” run ops/deposit.mjs first"); process.exit(1); }
 
 const { h2, h3, poseidon, F } = await makePoseidon();
 const hN = (arr) => F.toObject(poseidon(arr));
@@ -144,8 +155,8 @@ if (cmd === "threshold") {
     selector: "proveThreshold",
     sig: "proveThreshold(uint256[2],uint256[2][2],uint256[2],uint256[3])",
     question: `is this position at most ${toDisplay(capUnits)} ${dep.assetSymbol}?`,
-    ctx, kind: "threshold",
-    answer: `yes — position <= ${toDisplay(capUnits)}, figure not disclosed`,
+    ctx, kind: "threshold", subject: BigInt(n.commitment),
+    answer: `yes â€” position <= ${toDisplay(capUnits)}, figure not disclosed`,
     input: {
       commitment: BigInt(n.commitment).toString(),
       threshold: capUnits.toString(),
@@ -167,9 +178,9 @@ else if (cmd === "range") {
     circuit: "rangeDisclosure",
     selector: "proveRange",
     sig: "proveRange(uint256[2],uint256[2][2],uint256[2],uint256[4])",
-    question: `is this position inside the ${toDisplay(lo)}–${toDisplay(hi)} reporting bracket?`,
-    ctx, kind: "range",
-    answer: `yes — inside the bracket, figure not disclosed`,
+    question: `is this position inside the ${toDisplay(lo)}â€“${toDisplay(hi)} reporting bracket?`,
+    ctx, kind: "range", subject: BigInt(n.commitment),
+    answer: `yes â€” inside the bracket, figure not disclosed`,
     input: {
       commitment: BigInt(n.commitment).toString(),
       lower: lo.toString(),
@@ -191,7 +202,7 @@ else if (cmd === "exact") {
     selector: "proveExact",
     sig: "proveExact(uint256[2],uint256[2][2],uint256[2],uint256[3])",
     question: `disclose this position in full`,
-    ctx, kind: "exact",
+    ctx, kind: "exact", subject: BigInt(n.commitment),
     answer: `${toDisplay(BigInt(n.amount))} ${dep.assetSymbol}`,
     input: {
       commitment: BigInt(n.commitment).toString(),
@@ -206,7 +217,44 @@ else if (cmd === "exact") {
 
 else if (cmd === "aggregate") {
   const capUnits = BigInt(Math.round(Number(args[0] ?? 2000) * 1e6));
-  const used = notes.slice(-AGG_SLOTS);
+
+  // THE SET IS THE AUDITOR'S TO CHOOSE, NOT THE HOLDER'S.
+  //
+  // The circuit checks that auditContextHash equals Poseidon over the enumerated
+  // commitments and their active flags, so a holder who drops a position computes a
+  // different hash and no proof exists. That property is only worth anything if the
+  // AUDITOR fixed the hash. If the prover picks the set and then asks for a request over
+  // its own choice, the constraint proves the answer matches the declared set and says
+  // nothing about whether the set was complete â€” which is a much weaker claim than the
+  // one worth making.
+  //
+  // So the required set is read from the register itself, on-chain, on the auditor's
+  // side: every commitment the contract holds, in the contract's own order.
+  const onChain = cast(["call", dep.pool, "allCommitments()(bytes32[])", "--rpc-url", RPC])
+    .replace(/[\[\]\s]/g, "")
+    .split(",")
+    .filter(Boolean);
+
+  const known = new Map(notes.map((n) => [BigInt(n.commitment).toString(), n]));
+  const required = onChain.map((c) => ({ commitment: c, note: known.get(BigInt(c).toString()) }));
+
+  if (required.length > AGG_SLOTS) {
+    console.log(
+      `the register holds ${required.length} positions; this circuit is fixed at ${AGG_SLOTS} slots.\n` +
+      `A wider set needs a wider circuit â€” answering over a subset would be exactly the\n` +
+      `cherry-picking this design exists to prevent, so it is refused rather than trimmed.`,
+    );
+    process.exit(1);
+  }
+  const missing = required.filter((r) => !r.note);
+  if (missing.length) {
+    console.log(`cannot open ${missing.length} of the register's positions â€” they belong to another holder.`);
+    console.log("An aggregate over the whole register needs every holder to contribute; refusing to answer partially.");
+    process.exit(1);
+  }
+
+  const used = required.map((r) => r.note);
+  console.log(`the auditor enumerated ${used.length} position(s) from the register on-chain`);
 
   // Pad to the circuit's fixed width. Padding slots are inactive: they contribute zero
   // and their commitments are unconstrained, but they are still inside the context hash,
@@ -221,7 +269,7 @@ else if (cmd === "aggregate") {
     blindings.push(n ? BigInt(n.blinding) : 0n);
   }
 
-  // auditContextHash = Poseidon(ctxNonce, commitments…, active…) — the circuit
+  // auditContextHash = Poseidon(ctxNonce, commitmentsâ€¦, activeâ€¦) â€” the circuit
   // recomputes this, so omitting a position changes the hash and no proof exists.
   const ctx = hN([nonce, ...commitments, ...active]);
   const total = amounts.reduce((a, b) => a + b, 0n);
@@ -233,8 +281,8 @@ else if (cmd === "aggregate") {
     selector: "proveAggregate",
     sig: "proveAggregate(uint256[2],uint256[2][2],uint256[2],uint256[13])",
     question: `is total exposure across all ${used.length} registered positions at most ${toDisplay(capUnits)} ${dep.assetSymbol}?`,
-    ctx, kind: "aggregate",
-    answer: `yes — sum of ${used.length} positions <= ${toDisplay(capUnits)}, no individual position disclosed`,
+    ctx, kind: "aggregate", subject: 0n,   // the set is named by the context hash
+    answer: `yes â€” sum of ${used.length} positions <= ${toDisplay(capUnits)}, no individual position disclosed`,
     input: {
       commitments: commitments.map(String),
       active: active.map(String),

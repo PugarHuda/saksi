@@ -66,9 +66,19 @@ abstract contract Ownable {
     error NotOwner();
     event OwnershipTransferred(address indexed from, address indexed to);
 
-    constructor(address initialOwner) { owner = initialOwner; }
+    error ZeroOwner();
+
+    constructor(address initialOwner) {
+        if (initialOwner == address(0)) revert ZeroOwner();
+        owner = initialOwner;
+    }
     modifier onlyOwner() { if (msg.sender != owner) revert NotOwner(); _; }
+
+    /// No renouncing to the zero address. Everything the register needs after deployment —
+    /// rotating the association root, publishing the note root, pausing — is owner-only,
+    /// so an owner of zero locks every deposit in the pool permanently.
     function transferOwnership(address to) external onlyOwner {
+        if (to == address(0)) revert ZeroOwner();
         emit OwnershipTransferred(owner, to);
         owner = to;
     }
@@ -152,6 +162,8 @@ contract SaksiPool is Ownable {
     /// being presented as the answer to another.
     mapping(uint256 => bool) public auditRequested;
     mapping(uint256 => uint8) public auditAnswered;   // 0 = open, else DisclosureKind
+    mapping(uint256 => uint256) public auditSubject;  // the commitment asked about; 0 = a set
+    mapping(uint256 => uint8) public auditKind;       // the answer the auditor will accept
 
     bool public paused;
 
@@ -167,7 +179,9 @@ contract SaksiPool is Ownable {
     event RootRetired(uint256 indexed root);
     event NoteRootPublished(uint256 indexed previousRoot, uint256 indexed newRoot);
     event DenyListSet(uint256[DENY_SLOTS] denyList);
-    event AuditRequested(uint256 indexed contextHash, address indexed by, string question);
+    event AuditRequested(
+        uint256 indexed contextHash, address indexed by, uint256 subject, uint8 kind, string question
+    );
     event DisclosureProved(uint256 indexed contextHash, uint8 kind, uint256 a, uint256 b);
     event PausedSet(bool paused);
     event AuditorSet(address indexed auditor);
@@ -192,6 +206,10 @@ contract SaksiPool is Ownable {
     error ValidatorRefused(address who);
     error AmountNotBound();
     error DuplicateOutput();
+    error WrongDisclosureKind();
+    error WrongSubject();
+    error FeeWithoutWithdrawal();
+    error ExceedsBacking();
 
     constructor(
         address _asset,
@@ -303,6 +321,12 @@ contract SaksiPool is Ownable {
         knownNoteRoot[newRoot] = true;
     }
 
+    /// A published note root is spendable forever otherwise, so a wrong one — mistaken or
+    /// malicious — has no undo. The association set has retireRoot; this is its twin.
+    function retireNoteRoot(uint256 root) external onlyOwner {
+        knownNoteRoot[root] = false;
+    }
+
     function setDenyList(uint256[DENY_SLOTS] calldata list) external onlyOwner {
         denyList = list;
         emit DenyListSet(list);
@@ -348,6 +372,12 @@ contract SaksiPool is Ownable {
         if (amount == 0) revert ZeroAmount();
         if (commitmentKnown[commitment]) revert CommitmentExists();
 
+        // A commitment must BE a field element, not merely reduce to one. Six distinct
+        // bytes32 values share each residue, so without this the same proof pair admits
+        // six register entries whose keys differ from the value every disclosure is forced
+        // to name — a position that spends normally and can never be audited.
+        if (uint256(commitment) >= FIELD) revert CommitmentNotBound();
+
         // GATE ONE — Cleanverse's Validator, on their contract, against this wallet's
         // live A-Pass and this pool's registered rule set.
         _requireEligible(msg.sender);
@@ -370,8 +400,12 @@ contract SaksiPool is Ownable {
         // what it is entering WITH. Without the three lines below, a depositor transfers
         // one unit, commits to a million, and the JoinSplit conserves the forgery out the
         // other side. The commitment must open to exactly the amount that moved.
-        if (bindSignals[0] != uint256(commitment) % FIELD) revert CommitmentNotBound();
+        if (bindSignals[0] != uint256(commitment)) revert CommitmentNotBound();
         if (bindSignals[1] != amount) revert AmountNotBound();
+        // Domain separation. The same circuit answers exact-disclosure questions, so an
+        // entry binding with a free context hash would be a structurally valid answer to
+        // whatever audit request the depositor chose to name.
+        if (bindSignals[2] != 0) revert CommitmentNotBound();
         if (!exactVerifier.verifyProof(bA, bB, bC, bindSignals)) revert InvalidProof();
 
         uint256 leafIndex = commitments.length;
@@ -402,13 +436,33 @@ contract SaksiPool is Ownable {
         if (!knownNoteRoot[pubSignals[0]]) revert UnknownNoteRoot();
         if (pubSignals[2] != extDataHashOf(recipient, relayer, fee)) revert ExtDataMismatch();
 
+        // The spender is checked too. The transfer circuit proves note ownership and value
+        // conservation; it carries no association-set input, so without this a holder
+        // whose credential was revoked keeps a fully working exit and "the position
+        // freezes" would be false.
+        //
+        // Stated honestly: this is a live check on whoever submits, and the transfer proof
+        // is not bound to msg.sender, so a revoked holder could still have an eligible
+        // party relay it. Closing that properly means adding the association set to the
+        // transfer circuit — which is a recompile and a new ceremony, not a patch. Entry
+        // is gated cryptographically; the exit is gated operationally, and the difference
+        // is real.
+        _requireEligible(msg.sender);
+
         // publicAmount is a field element: a withdrawal of x is encoded FIELD - x.
         uint256 publicAmount = pubSignals[1];
         uint256 withdrawn;
         if (publicAmount != 0) {
             if (publicAmount < FIELD / 2) revert DepositsUseDepositPath();
             withdrawn = FIELD - publicAmount;
+            // The circuit's range checks call themselves defence-in-depth. The contract
+            // should not be relying on them alone: nothing here can pay out more than the
+            // register is actually holding.
+            if (withdrawn > asset.balanceOf(address(this))) revert ExceedsBacking();
         }
+        // A fee is only payable out of a withdrawal. Silently pocketing it on an internal
+        // transfer would leave a relayer out of pocket for the gas.
+        if (withdrawn == 0 && fee != 0) revert FeeWithoutWithdrawal();
 
         bytes32 nA = bytes32(pubSignals[3]);
         bytes32 nB = bytes32(pubSignals[4]);
@@ -451,17 +505,35 @@ contract SaksiPool is Ownable {
     // ---- answerability -----------------------------------------------------
 
     /// The auditor registers the question before any answer exists, so the disclosure
-    /// proof that follows is bound to this specific request and cannot be reused as
-    /// the answer to a different one.
-    function requestAudit(uint256 contextHash, string calldata question) external {
+    /// proof that follows is bound to this specific request and cannot be reused as the
+    /// answer to a different one.
+    ///
+    /// The question names its SUBJECT and its KIND, and both are enforced. Without them
+    /// the request was an opaque flag that any known commitment could satisfy: a stranger
+    /// could deposit one unit and answer a concentration question with a vacuous
+    /// threshold proof about their own throwaway note, closing the request permanently
+    /// and writing a false answer into the record. A holder could use the same trick on
+    /// itself to downgrade an exact-disclosure demand.
+    ///
+    /// `subject` is the commitment the question is about; pass 0 for an aggregate, where
+    /// the circuit's own context hash already pins the whole set.
+    function requestAudit(uint256 contextHash, uint256 subject, uint8 kind, string calldata question)
+        external
+    {
         if (msg.sender != auditor) revert NotAuditor();
+        if (kind == 0 || kind > KIND_AGGREGATE) revert NoSuchAudit();
         auditRequested[contextHash] = true;
-        emit AuditRequested(contextHash, msg.sender, question);
+        auditSubject[contextHash] = subject;
+        auditKind[contextHash] = kind;
+        emit AuditRequested(contextHash, msg.sender, subject, kind, question);
     }
 
-    function _openAudit(uint256 contextHash) internal view {
+    /// Open, of the right kind, and about the position the auditor actually asked about.
+    function _openAudit(uint256 contextHash, uint256 subject, uint8 kind) internal view {
         if (!auditRequested[contextHash]) revert NoSuchAudit();
         if (auditAnswered[contextHash] != 0) revert AuditClosed();
+        if (auditKind[contextHash] != kind) revert WrongDisclosureKind();
+        if (auditSubject[contextHash] != subject) revert WrongSubject();
     }
 
     function _requireKnown(uint256 commitment) internal view {
@@ -473,7 +545,7 @@ contract SaksiPool is Ownable {
     function proveExact(
         uint[2] calldata pA, uint[2][2] calldata pB, uint[2] calldata pC, uint[3] calldata s
     ) external {
-        _openAudit(s[2]);
+        _openAudit(s[2], s[0], KIND_EXACT);
         _requireKnown(s[0]);
         if (!exactVerifier.verifyProof(pA, pB, pC, s)) revert InvalidProof();
         auditAnswered[s[2]] = KIND_EXACT;
@@ -486,7 +558,7 @@ contract SaksiPool is Ownable {
     function proveThreshold(
         uint[2] calldata pA, uint[2][2] calldata pB, uint[2] calldata pC, uint[3] calldata s
     ) external {
-        _openAudit(s[2]);
+        _openAudit(s[2], s[0], KIND_THRESHOLD);
         _requireKnown(s[0]);
         if (!thresholdVerifier.verifyProof(pA, pB, pC, s)) revert InvalidProof();
         auditAnswered[s[2]] = KIND_THRESHOLD;
@@ -498,7 +570,7 @@ contract SaksiPool is Ownable {
     function proveRange(
         uint[2] calldata pA, uint[2][2] calldata pB, uint[2] calldata pC, uint[4] calldata s
     ) external {
-        _openAudit(s[3]);
+        _openAudit(s[3], s[0], KIND_RANGE);
         _requireKnown(s[0]);
         if (!rangeVerifier.verifyProof(pA, pB, pC, s)) revert InvalidProof();
         auditAnswered[s[3]] = KIND_RANGE;
@@ -512,7 +584,9 @@ contract SaksiPool is Ownable {
     function proveAggregate(
         uint[2] calldata pA, uint[2][2] calldata pB, uint[2] calldata pC, uint[13] calldata s
     ) external {
-        _openAudit(s[11]);
+        // Subject 0: the set is named by the context hash the circuit itself recomputes,
+        // so there is no single commitment for the auditor to have pinned.
+        _openAudit(s[11], 0, KIND_AGGREGATE);
         for (uint256 i = 0; i < AGG_SLOTS; i++) {
             uint256 flag = s[AGG_SLOTS + i];
             if (flag > 1) revert NotBoolean();
