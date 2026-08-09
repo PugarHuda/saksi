@@ -441,7 +441,9 @@ export default function Deck() {
             <p className="d-sub">
               <code className="mono">node ops/gate-gap.mjs</code> asks Cleanverse&rsquo;s
               validator about <strong>every member of the set</strong> — all{" "}
-              {dep.aspAdmitted ?? 524}, one call each, about four and a half minutes. Not a
+              {dep.aspAdmitted ?? 524}, one call each — four and a half minutes here, nearer fifteen on a clean clone, since it
+                spawns a process per member against an endpoint that caps around fifteen requests
+                a second. Not a
               sample.
             </p>
           </div>
@@ -798,11 +800,32 @@ export default function Deck() {
                 since a named block.
               </li>
               <li>
-                <strong>Which commitments are live is public.</strong>{" "}
-                <code className="mono">notes.public.json</code> publishes them, so
-                set-differencing against <code className="mono">allCommitments()</code> names
-                the spent ones. What is hidden is which input became which output, and what any
-                of them is worth.
+                <strong>Which commitments were live WAS public, and it cost us the transfer
+                graph.</strong>{" "}
+                <code className="mono">notes.public.json</code> was written from the operator&apos;s
+                ledgers, which drop a position when it is spent — so the file was exactly the live
+                set, and nothing else publishes that. An adversarial review took the spent set by
+                subtraction, which forces every two-input JoinSplit&apos;s inputs by elimination,
+                which makes conservation solvable against the plaintext deposit amounts — and
+                recovered <strong>270.1 CVA on leaf 4, an amount no audit ever disclosed</strong>,
+                from the public repo and the chain alone. The index is built from{" "}
+                <code className="mono">CommitmentInserted</code> now and lists all twelve leaves
+                with no liveness field. That closes the method; what was already recovered stays
+                recovered.
+              </li>
+              <li>
+                <strong>Four more contract fixes are in the source and not on the live pool.</strong>{" "}
+                The sharpest: <code className="mono">transact()</code> gates both edges through
+                Cleanverse&apos;s validator and never consulted <em>our own</em> deny list on the
+                exit, so a sanctioned wallet could be paid out while{" "}
+                <code className="mono">canTransferWithReason</code> answered{" "}
+                <code className="mono">RECIPIENT_SANCTIONED</code> about that same transfer. What
+                screens the live exit is their blacklist, not ours. Also:{" "}
+                <code className="mono">requestAudit</code> let an <em>open</em> question be
+                rewritten in place — about a quarter of a MON to make both permanently-unanswered
+                requests read as answered, by the one party whose disinterest this deck asks you
+                to assume. Every call emits <code className="mono">AuditRequested</code>, so on the
+                live pool that rewrite is visible in the log rather than prevented.
               </li>
               <li>
                 <strong>Prior work, declared.</strong> The seven Circom circuits and their
