@@ -145,6 +145,22 @@ by rebuild, and an auditor who can compel a bounded answer and get a *recorded n
 - **Both gates root in one authority.** They diverge in *time*, not in trust: a compromised
   Cleanverse sandbox defeats both.
 - **Single-EOA owner**, no timelock or multisig, who can rotate roots and set the auditor.
+- **The tree can be filled for the price of gas, and the fix is in the source rather than on
+  the chain.** A zero-amount input skips the Merkle check — that is how a 1-in transfer is
+  expressed in a fixed 2-in circuit — but nothing stopped a transaction being *all* dummies,
+  and one still inserts two commitments. So any wallet the pool admits could append leaves
+  for gas alone: ~508 transactions fill a 2^10 tree, and every deposit landing past leaf 1023
+  is then unspendable forever, because `inLeafIndex` is `Num2Bits(levels)`-bounded and no
+  witness exists for it. `transfer.circom` now requires at least one real input, so filling
+  the tree costs a real note per transaction; `SaksiPool` now refuses a deposit or transfer
+  that would push `commitments[]` past `TREE_CAPACITY`, which turns silent permanent loss
+  into a revert. **Neither is deployed.** The circuit change needs a recompile and a fresh
+  phase-2 ceremony, and the contract change needs a redeploy that would reset the evidence
+  chain above — two permanently open audit requests whose value is precisely that they have
+  been open since a specific block. The register holds 8 of 1,024 leaves, so the attack is
+  1,016 insertions away and deploying the guard would change nothing about this deployment
+  except its history. Tested at `contracts/test/Audit3.t.sol`; stated here rather than
+  quietly shipped.
 - **The four positions on chain today are arithmetically derivable, and that is our bug, not
   the design's.** `ops/transfer.mjs` split each JoinSplit 37/63 — a constant in a public
   repository — and deposits are plaintext, so anyone can compute every note from the deposit

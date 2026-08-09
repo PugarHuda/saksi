@@ -628,4 +628,33 @@ contract Audit3Test is Test {
         assertTrue(pool.commitmentKnown(c),
             "FINDING: nothing on-chain holds an amount inside the 64 bits every disclosure circuit needs");
     }
+
+    // ---- tree capacity ---------------------------------------------------
+    //
+    // A leaf past 2^levels has no witness, because inLeafIndex is Num2Bits(levels)-bounded
+    // in every circuit. Before the cap, deposit() and transact() kept appending past it, so
+    // a full tree turned every later deposit into a permanent loss with no error at all.
+
+    function test_OK_DepositRefusedAtTreeCapacity() public {
+        uint256 cap = pool.TREE_CAPACITY();
+        assertEq(cap, 1024, "the contract must know the circuits' depth");
+        assertLt(pool.commitmentCount(), cap, "fixture must start below capacity");
+    }
+
+    function test_OK_TreeCapacityIsEnforcedNotAssumed() public {
+        // The guard is a comparison against commitments.length, so it binds both paths:
+        // deposit needs one free slot, transact needs two.
+        assertEq(pool.TREE_CAPACITY(), 1 << 10);
+        vm.expectRevert(SaksiPool.TreeFull.selector);
+        this.depositPastCapacity();
+    }
+
+    /// Fills the array through storage so the test does not have to mine 1024 deposits.
+    function depositPastCapacity() external {
+        // commitments.length lives in slot 13 (forge inspect storage-layout).
+        vm.store(address(pool), bytes32(uint256(13)), bytes32(pool.TREE_CAPACITY()));
+        uint[11] memory p = _pub(holder, bytes32(uint256(900)));
+        vm.prank(holder);
+        pool.deposit(1, bytes32(uint256(900)), pA, pB, pC, p, pA, pB, pC, _bind(bytes32(uint256(900)), 1));
+    }
 }

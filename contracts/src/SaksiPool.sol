@@ -131,6 +131,11 @@ contract SaksiPool is Ownable {
         21888242871839275222246405745257275088548364400416034343698204186575808495617;
 
     uint256 public constant DENY_SLOTS = 8;
+    /// 2^levels of the Circom trees. A leaf past this has no witness — inLeafIndex is
+    /// Num2Bits(levels)-bounded — so anything inserted beyond it is unspendable forever.
+    /// The contract has to know the number the circuits were compiled with, because nothing
+    /// else in the system does.
+    uint256 public constant TREE_CAPACITY = 1 << 10;
     uint256 public constant AGG_SLOTS = 5;
 
     IERC20 public immutable asset;              // the CVA this register tracks
@@ -233,6 +238,7 @@ contract SaksiPool is Ownable {
     error WrongClaim();
     error FeeWithoutWithdrawal();
     error ExceedsBacking();
+    error TreeFull();
 
     constructor(
         address _asset,
@@ -404,6 +410,10 @@ contract SaksiPool is Ownable {
         // bytes32 values share each residue, so without this the same proof pair admits
         // six register entries whose keys differ from the value every disclosure is forced
         // to name — a position that spends normally and can never be audited.
+        // Past capacity the note tree cannot produce a witness for the new leaf, so the
+        // position would be permanently unspendable. Checked first: it costs one SLOAD and
+        // refusing here saves the caller two Groth16 verifications they cannot use.
+        if (commitments.length + 1 > TREE_CAPACITY) revert TreeFull();
         if (uint256(commitment) >= FIELD) revert CommitmentNotBound();
 
         // GATE ONE — Cleanverse's Validator, on their contract, against this wallet's
@@ -469,6 +479,8 @@ contract SaksiPool is Ownable {
         uint[7] calldata pubSignals,
         address recipient, address relayer, uint256 fee
     ) external notPaused {
+        // A transfer inserts two leaves, so it needs two free slots.
+        if (commitments.length + 2 > TREE_CAPACITY) revert TreeFull();
         if (!knownNoteRoot[pubSignals[0]]) revert UnknownNoteRoot();
         if (pubSignals[2] != extDataHashOf(recipient, relayer, fee)) revert ExtDataMismatch();
 

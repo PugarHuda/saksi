@@ -582,7 +582,11 @@ footer.foot {
 }
 
 .split-visual {
-  background: #0b0f1a;                 /* the mark's ink, in both themes — this panel is the dark half */
+  /* A light ground, not the mark's ink. The field of commitments carries the colour; the
+     panel itself stays as bright as the one beside it. */
+  background:
+    radial-gradient(ellipse at 52% 42%, var(--accent-soft), transparent 62%),
+    var(--surface-2);
   border: 1px solid var(--border);
   border-left: 0;
   border-radius: 0 var(--r) var(--r) 0;
@@ -602,16 +606,17 @@ footer.foot {
   z-index: 2;
 }
 .visual-nav a {
-  color: rgba(230, 234, 242, 0.72);
+  color: var(--muted);
   font-size: 12.5px;
   padding: 10px 12px;                 /* keeps a 40px target the text alone would miss */
   text-decoration: none;
 }
-.visual-nav a:hover { color: #e6eaf2; }
+.visual-nav a:hover { color: var(--foreground); }
 .visual-nav a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .cipher {
-  color: rgba(233, 185, 73, 0.5);
+  color: var(--accent);
+  opacity: 0.42;
   font-size: clamp(8px, 1.05vw, 12px);
   inset: 0;
   letter-spacing: 0.14em;
@@ -629,11 +634,12 @@ footer.foot {
 }
 
 .visual-card {
-  background: rgba(11, 15, 26, 0.82);
+  background: var(--surface);
   backdrop-filter: blur(7px);
-  border: 1px solid rgba(233, 185, 73, 0.28);
+  border: 1px solid var(--border);
+  border-left: 2px solid var(--accent);
   border-radius: var(--r);
-  color: #e6eaf2;
+  color: var(--foreground);
   margin: 18px;
   max-width: 25em;
   padding: 16px 18px;
@@ -646,9 +652,9 @@ footer.foot {
   letter-spacing: 0.14em;
   margin: 0 0 8px;
 }
-.visual-card p { color: rgba(230, 234, 242, 0.74); font-size: 12.5px; line-height: 1.55; margin: 0; }
+.visual-card p { color: var(--muted); font-size: 12.5px; line-height: 1.55; margin: 0; }
 .visual-card .card-q {
-  border-top: 1px solid rgba(233, 185, 73, 0.22);
+  border-top: 1px solid var(--border);
   color: var(--accent);
   margin-top: 10px;
   padding-top: 10px;

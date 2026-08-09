@@ -123,6 +123,30 @@ template Transfer(levels, nIns, nOuts) {
         }
     }
 
+    // At least one input must be REAL.
+    //
+    // A zero-amount input skips the Merkle check by construction — that is what makes it a
+    // dummy, and it is how a 1-in transfer is expressed in a fixed 2-in circuit. Nothing
+    // stopped a transaction from being ALL dummies, and such a transaction still inserts two
+    // output commitments. So any wallet the pool admits could append leaves for the price of
+    // gas: ~508 transactions fill a 2^10 tree, and every deposit landing past leaf 1023 is
+    // then unspendable forever, because inLeafIndex is Num2Bits(levels)-bounded and no
+    // witness exists for it. Cheap griefing turning into permanent, unrecoverable loss.
+    //
+    // Requiring one real input does not make appending impossible — it makes it cost a real
+    // note per transaction instead of gas, which is the difference between an attack anyone
+    // can run and one that pays for the privilege.
+    component inIsZero[nIns];
+    var realInputs = 0;
+    for (var i = 0; i < nIns; i++) {
+        inIsZero[i] = IsZero();
+        inIsZero[i].in <== inAmount[i];
+        realInputs += 1 - inIsZero[i].out;
+    }
+    component noRealInput = IsZero();
+    noRealInput.in <== realInputs;
+    noRealInput.out === 0;
+
     // value conservation
     sumIn + publicAmount === sumOut;
 

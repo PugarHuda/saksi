@@ -13,7 +13,10 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${sans.variable} ${mono.variable}`}>
+    // Pinned light. The palette below still defines a full dark set and the CSS still
+    // honours [data-theme="dark"], so a theme switch remains one attribute away — but the
+    // product commits to one look rather than inheriting whatever the reader's OS is set to.
+    <html lang="en" data-theme="light" className={`${sans.variable} ${mono.variable}`}>
       <body>{children}</body>
     </html>
   );
