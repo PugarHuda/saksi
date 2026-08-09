@@ -1,0 +1,50 @@
+[
+  {
+    "kind": "threshold",
+    "question": "is this position at most 500 SAKSIAZEV?",
+    "circuit": "thresholdDisclosure",
+    "contextHash": "20922838381461621855411165649926270274210761960502875591555497824882581099792",
+    "answer": "yes — position <= 500, figure not disclosed",
+    "requestTx": "0x57573fbe6880648808fd69f0128759c8dd77175760d6998e326ac93b8b12caa1",
+    "verifyTx": "0x547628baf062c5fe8148724ac9cc63375f016208c1f99e0b260523184261e4c7",
+    "verified": true,
+    "proveMs": 707,
+    "at": "2026-08-09T05:51:45.756Z"
+  },
+  {
+    "kind": "range",
+    "question": "is this position inside the 100–600 reporting bracket?",
+    "circuit": "rangeDisclosure",
+    "contextHash": "2899213430137812577797155682250535979219629160424153388690229365684382179323",
+    "answer": "yes — inside the bracket, figure not disclosed",
+    "requestTx": "0x23c27a9bcea5ff9163095d4d918376babe60798766b4d94f535a58e0c159b982",
+    "verifyTx": "0x08342d27154ebae54d353b448778971079d71441f49a7ad43aa8a9de39d8ef53",
+    "verified": true,
+    "proveMs": 770,
+    "at": "2026-08-09T05:51:50.631Z"
+  },
+  {
+    "kind": "exact",
+    "question": "disclose this position in full",
+    "circuit": "disclosure",
+    "contextHash": "10445510328582361659141613232860971939584846216584931549746009588326141992720",
+    "answer": "480 SAKSIAZEV",
+    "requestTx": "0x1f4217d52f3ba1410e975c04a0139fcb3631899b330ca318ca20232b6088e4d2",
+    "verifyTx": "0xa480a39b9baec842b6ab4fe2233a6ed4434f73cff8b56e7f41cba14a9dbaedff",
+    "verified": true,
+    "proveMs": 630,
+    "at": "2026-08-09T05:51:55.531Z"
+  },
+  {
+    "kind": "aggregate",
+    "question": "is total exposure across all 3 registered positions at most 1.000 SAKSIAZEV?",
+    "circuit": "aggregateDisclosure",
+    "contextHash": "8675759009221519577160643162685415831028748132588524303752776195075905765577",
+    "answer": "yes — sum of 3 positions <= 1.000, no individual position disclosed",
+    "requestTx": "0x0ced9c648b8f98cb793d82c0e1b44f5d9406646ec1bb86116c3f5536c7268ca9",
+    "verifyTx": "0x16cfbdd394086868c723d92986096415503c3b6de6fb53c8b4e63e971ad24fed",
+    "verified": true,
+    "proveMs": 1077,
+    "at": "2026-08-09T05:52:00.676Z"
+  }
+]

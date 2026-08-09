@@ -1,0 +1,52 @@
+{
+  "atokenRequestId": "IA20260809130326467569",
+  "atokenSymbolRequested": "SAKSIAZEV",
+  "chain": "monad",
+  "atoken": "0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B",
+  "atokenSymbol": "SAKSIAZEV",
+  "atokenTx": "0xa372e15015b4a1ab44202eecc1b2684b2546ae9ded23d6224bee87e26321c3d0",
+  "atokenRule": {
+    "allowed_group": "",
+    "allowed_sub_group": "",
+    "min_tier": 30,
+    "min_sub_tier": 0,
+    "is_black_list": false,
+    "countries": []
+  },
+  "atokenAdmin": "0x5C229A479db6756780e36935aE4917B9f3C6D527",
+  "aspRoot": "4687537074309769095732935007427652386986710712273402142465306901494784652441",
+  "aspBuiltAt": "2026-08-09T05:54:38.435Z",
+  "aspAdmitted": 44,
+  "pool": "0x9BB3af71497304506Be2810915016742394f72f2",
+  "verifiers": {
+    "compliance": "0xd9911689e884598f563fffa6e3d2166963d731fd",
+    "transfer": "0xa98cee28c6eb35b6ee7440b7490e265f23975d61",
+    "exact": "0x2960aece70bb3e80ed389147c79de1f6ff822563",
+    "threshold": "0xfb6aa86244babf35ee6e5a4b359cf59cd9e8cad7",
+    "range": "0x2b81cd713fb98622c0d14f2019d68b21e39a6a1e",
+    "aggregate": "0x7e7684bb2e7fc1790bfbfed80d01fc51b4f3b969"
+  },
+  "asset": "0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B",
+  "assetSymbol": "SAKSIAZEV",
+  "issuer": "0x4490CcB0abdE3D2E494dE5cC118F7D0D74b44639",
+  "issuerDepositAddress": "0x09e5D940573AF07C95761aD2882A5fda5Ae3144E",
+  "chainId": 10143,
+  "explorer": "https://testnet.monadexplorer.com",
+  "validatorRegisterTx": "0x4288e8450e3838b722499c10a77ae744b3a053211f946989ebf36a2af2909dcb",
+  "validatorRule": {
+    "allowed_group": "",
+    "allowed_sub_group": "",
+    "min_tier": 30,
+    "min_sub_tier": 0,
+    "is_black_list": false,
+    "countries": []
+  },
+  "validator": "0xaC7e5179C2C7f03f209136886c172eb34F161792",
+  "poolV0": "0xDaDA618e564EdAF7ec0AF0a12575BF3C0dc8523b",
+  "assetName": "Saksi Series A Note",
+  "assetDecimals": 6,
+  "poolHistory": [
+    "0xDaDA618e564EdAF7ec0AF0a12575BF3C0dc8523b",
+    "0xfbbdcf79c34f264f55e8843a4bc8cd127e3732cb"
+  ]
+}
