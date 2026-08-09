@@ -15,11 +15,15 @@
 // a sample of possible holders; it is the complete set of them. Calling balanceOf for
 // every eligible wallet against every A-Token is an exhaustive census, not an estimate.
 //
-// CAVEAT, stated rather than buried: this counts holders whose credential is active in
-// the association set at the time of measurement. A wallet credentialed after the
-// snapshot, or frozen since, is not counted. The direction of that error is knowable —
-// it can only undercount — so the anonymity sets reported here are upper bounds on
-// privacy, i.e. the real picture is at least this exposed.
+// CAVEAT, stated rather than buried, and stated in the right direction. The census can
+// only MISS holders, never invent them: a wallet credentialed through another integration,
+// or holding through a Cleanverse deposit address rather than its own, is not enumerated.
+// Missing holders makes each anonymity set look SMALLER than it truly is. So every count
+// here is a floor: the real crowd is at least this large, and the real picture is at MOST
+// this exposed.
+//
+// An earlier version of this comment said the opposite, which had the convenient property
+// of flattering the argument the measurement exists to support. Worth naming.
 
 import "./env.mjs";
 import fs from "node:fs";
@@ -111,14 +115,20 @@ for (let page = 1; page <= 20; page++) {
 // ---- every CVA on this chain -------------------------------------------------
 
 const tokens = new Map(); // address -> symbol
-try {
-  const mine = await cv.listMyAtokens();
-  for (const it of mine.items ?? mine.list ?? mine) {
+// Paginate. The documented default page size is 20 against hundreds of rows, so a single
+// unparameterised call quietly measured the first page and called it the population.
+for (let page = 1; page <= 20; page++) {
+  let batch;
+  try { batch = await cv.listMyAtokens({ page, page_size: 100 }); }
+  catch (e) { console.log(`list_my_atokens page ${page}: ${e.message}`); break; }
+  const items = batch.items ?? batch.list ?? batch ?? [];
+  for (const it of items) {
     if (it.chain === CHAIN && it.applyStatus === "ISSUED" && /^0x[0-9a-fA-F]{40}$/.test(it.atokenAddress ?? "")) {
       tokens.set(it.atokenAddress.toLowerCase(), it.tokenSymbol ?? "?");
     }
   }
-} catch (e) { console.log(`list_my_atokens: ${e.message}`); }
+  if (items.length < 100) break;
+}
 try {
   const pairs = await cv.post("query_deposit_atoken_list", { chain: CHAIN });
   for (const p of pairs.tokens ?? []) {
@@ -148,30 +158,26 @@ const addresses = [...wallets.keys()];
 // Self-check before trusting any of this. We know four balances on our own asset from
 // having created them; if the read path cannot reproduce those, the census is measuring
 // the endpoint's rate limiter rather than the chain, and must not be published.
-const KNOWN = [
-  [process.env.DEPLOYER_ADDRESS, "issuer"],
-  [readDeploymentPool(), "pool"],
-];
-function readDeploymentPool() {
-  try { return JSON.parse(fs.readFileSync(path.join(ROOT, "deployment.json"), "utf8")).pool; }
-  catch { return null; }
+// The issuer minted the supply and has never spent all of it, so a zero here means the
+// read path is lying rather than the balance being zero. The pool is deliberately NOT
+// used as a probe: after a redeploy it legitimately holds nothing, and a self-check that
+// fires on a true zero teaches you to ignore it.
+const dep0 = JSON.parse(fs.readFileSync(path.join(ROOT, "deployment.json"), "utf8"));
+const OURS = dep0.asset;
+const issuer = process.env.DEPLOYER_ADDRESS;
+
+const probe = uint(await call(OURS, "0x70a08231" + pad(issuer)));
+if (probe === 0n) {
+  console.error(`self-check failed: the issuer reads a zero balance on our own asset.`);
+  console.error("The read path is unreliable; refusing to publish a census built on it.");
+  process.exit(1);
 }
-const OURS = JSON.parse(fs.readFileSync(path.join(ROOT, "deployment.json"), "utf8")).asset;
-for (const [who, label] of KNOWN) {
-  if (!who) continue;
-  const v = uint(await call(OURS, "0x70a08231" + pad(who)));
-  if (v === 0n) {
-    console.error(`self-check failed: ${label} ${who} reads a zero balance on our own asset.`);
-    console.error("The read path is unreliable; refusing to publish a census built on it.");
-    process.exit(1);
-  }
-  if (!wallets.has(who.toLowerCase())) {
-    console.error(`self-check failed: ${label} holds the asset but is absent from the enumerated population.`);
-    console.error("The population is incomplete; the census would overstate confidentiality.");
-    process.exit(1);
-  }
+if (!wallets.has(issuer.toLowerCase())) {
+  console.error("self-check failed: the issuer holds the asset but is not in the enumerated population.");
+  console.error("The population is incomplete; the census would overstate confidentiality.");
+  process.exit(1);
 }
-console.log("self-check passed: known balances reproduce, known holders are enumerated\n");
+console.log("self-check passed: a known balance reproduces and its holder is enumerated\n");
 
 const rows = [];
 for (const [token, symbol, supply] of live) {
@@ -227,8 +233,8 @@ fs.writeFileSync(
         "every A-Token on this chain. A CVA transfer requires a credential on both sides, " +
         "so the credentialed set is the complete set of possible holders.",
       caveat:
-        "counts only credentials active at measurement time; can only undercount, so the " +
-        "anonymity sets reported are upper bounds",
+        "the census can only miss holders, never invent them, so every count is a floor: " +
+        "the true anonymity set is at least this large and the real picture at most this exposed",
       walletsEnumerated: wallets.size,
       tokensEnumerated: tokens.size,
       assetsWithHolders: rows.length,

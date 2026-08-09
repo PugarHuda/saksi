@@ -165,6 +165,13 @@ const out = cast(["send", dep.pool,
 const lines = out.split("\n").filter((l) => /^(status|transactionHash|gasUsed|blockNumber)/.test(l));
 console.log(lines.join("\n"));
 
+// A mined-but-reverted deposit still prints a transaction hash. Recording the note anyway
+// would leave notes.json holding a position the pool never stored, and the next audit
+// would prove against a commitment the contract has never heard of.
+if (!/^status\s+1/m.test(out)) {
+  throw new Error("deposit transaction reverted — refusing to record a position the register does not hold");
+}
+
 const txHash = /transactionHash\s+(0x[0-9a-f]+)/.exec(out)?.[1];
 artifact.depositTx = txHash;
 saveNote(artifact);

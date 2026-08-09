@@ -81,9 +81,11 @@ for (const [addr, name] of SUBJECTS) {
 const w = head.map((_, i) => Math.max(...rows.map((r) => (r[i] ?? "").length)));
 for (const r of rows) console.log(r.map((c, i) => (c ?? "").padEnd(w[i])).join("  "));
 
+// Only a real answer counts as disagreement. A reverted call is an unknown, and folding
+// unknowns into the headline would inflate the one number this table exists to report.
 const disagreements = rows
   .slice(2)
-  .filter((r) => (r[2] === "ADMITS") !== (r[3] === "ADMITS"));
+  .filter((r) => r[2] !== "reverted" && (r[2] === "ADMITS") !== (r[3] === "ADMITS"));
 
 console.log(`\n${disagreements.length} address(es) the two gates disagree about.`);
 if (disagreements.length) {

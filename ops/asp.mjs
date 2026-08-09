@@ -41,8 +41,13 @@ export const sourceKeyOf = (addr) =>
 
 async function pullApassPopulation() {
   const seen = new Map();
+  // No server-side status filter. `status` is null on the overwhelming majority of list
+  // rows — sampling them against query_apass returns status 1 every time — so filtering on
+  // it server-side dropped roughly seven eighths of the eligible population and left the
+  // association set looking like a handful of wallets we happened to know about. Status is
+  // decided below, per wallet, from the authoritative per-wallet record.
   for (let page = 1; page <= 20; page++) {
-    const res = await cv.queryApassList({ chain: CHAIN, status: 1, page, pageSize: 100 });
+    const res = await cv.queryApassList({ chain: CHAIN, page, pageSize: 100 });
     const items = res.items ?? [];
     for (const it of items) {
       const addr = it.walletAddress;
@@ -75,7 +80,15 @@ async function pullApassPopulation() {
         registeredAt: new Date().toISOString(),
         label: w.label,
       });
-    } catch { /* no record on this chain — leave whatever the list said */ }
+    } catch (e) {
+      // A dropped packet must never read as a withdrawn credential. If it did, this
+      // wallet would appear in `dropped`, be published in the evidence table as revoked,
+      // and lose the ability to prove membership — all because of a transient 429.
+      throw new Error(
+        `could not read the credential for ${w.address} (${w.label ?? "unlabelled"}): ${e.message}\n` +
+        `Refusing to build a set that might silently exclude a live holder.`,
+      );
+    }
   }
   return [...seen.values()];
 }

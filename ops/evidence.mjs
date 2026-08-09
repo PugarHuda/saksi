@@ -98,8 +98,15 @@ for (const a of audit) {
 line();
 line(md ? "### Positions" : "POSITIONS");
 line();
-const holders = new Set(notes.map((n) => n.wallet.toLowerCase()));
-line(`${notes.length} shielded positions across ${holders.size} verified holders`);
+// The public index no longer carries the wallet that opened each commitment — that was
+// the mapping the console renders as shielded — so the holder count is not derivable here
+// and is not going to be guessed at. Saying "positions" and stopping is the honest report.
+const holders = new Set(notes.map((n) => n.wallet).filter(Boolean).map((w) => w.toLowerCase()));
+line(
+  holders.size
+    ? `${notes.length} shielded positions across ${holders.size} verified holders`
+    : `${notes.length} shielded positions (holders not published in this index)`,
+);
 for (const n of notes) {
   const r = await receipt(n.depositTx);
   line(`  ${n.commitment.slice(0, 12)}…  blk ${r?.block ?? "-"}  ${r?.gas?.toLocaleString("en-US") ?? "-"} gas  ${r?.ok ? "ok" : "FAILED"}`);

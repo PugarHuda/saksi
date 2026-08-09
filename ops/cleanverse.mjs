@@ -14,11 +14,29 @@ import { randomUUID } from "node:crypto";
 const SANDBOX = "https://uatapi.cleanverse.com/api/cooperate";
 const PROD = "https://api.cleanverse.com/api/cooperate";
 
-/** Endpoints that accept plain JSON. Everything else must be encrypted. */
-const PLAIN = new Set([
-  "validator/is_register", "validator/rules", "validator/verify", "validator/is_paused",
-  "query_apass", "query_apass_list", "query_deposit_address",
-  "query_ramp_countries", "query_ramp_fiat_currencies", "query_ramp_crypto_currencies",
+/** The endpoints that require an encrypted body — the docs give this as an allowlist of
+ *  twenty, and everything else takes plain JSON.
+ *
+ *  This was originally written the other way round, as a list of plain endpoints with
+ *  encryption as the default, and that is a dangerous inversion: sending an encrypted body
+ *  to an endpoint that expects plain does NOT error. The gateway answers `0000` and
+ *  ignores the body entirely, falling back to defaults — so a filtered query silently
+ *  becomes an unfiltered one. `query_deposit_atoken_list` returned every token on every
+ *  chain instead of one chain's, and a measurement was built on the result before anyone
+ *  noticed. An allowlist of encrypted paths fails the safe way: a new endpoint defaults to
+ *  plain, and a plain endpoint that should be encrypted returns a loud 403. */
+const ENCRYPTED = new Set([
+  "generate_apass", "update_status",
+  "atoken/launch", "atoken/register_atoken",
+  "atoken/launch_wrapped_atoken", "atoken/register_wrapped_atoken",
+  "atoken/add_rule", "atoken/remove_rule", "atoken/set_paused",
+  "atoken/add_whitelist_for_institutional",
+  "atoken/remove_whitelist_for_institutional",
+  "atoken/restore_whitelist_for_institutional",
+  "blacklist/add",
+  "validator/grant", "validator/register",
+  "validator/set_rule", "validator/add_rule", "validator/remove_rule",
+  "validator/set_paused",
 ]);
 
 export class Cleanverse {
@@ -42,7 +60,7 @@ export class Cleanverse {
 
   /** POST to `path`. Encryption is chosen by the endpoint, not by the caller. */
   async post(path, payload = {}) {
-    const encrypted = !PLAIN.has(path);
+    const encrypted = ENCRYPTED.has(path);
     const res = await fetch(`${this.base}/${path}`, {
       method: "POST",
       headers: {
