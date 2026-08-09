@@ -12,7 +12,11 @@ inside an iframe; Cloudflare blocks plain curl, so re-fetch with a browser sessi
 |---|---|---|
 | Sandbox base | `https://uatapi.cleanverse.com/api/cooperate` | ✅ |
 | Production base | `https://api.cleanverse.com/api/cooperate` | — |
-| `api-id` header | ``APP2026…` — redacted; the value was committed here and has been rotated` | ✅ `query_ramp_countries` → `0000 success` |
+> The api-id was committed in this row and served publicly until the history was
+> rewritten on 9 Aug. It has **not** been rotated: Cleanverse have said the hackathon
+> credentials are disabled once the event closes. Treat it as burned.
+
+| `api-id` header | `APP2026…` (redacted) | ✅ `query_ramp_countries` → `0000 success` |
 | `api-key` (AES only, never sent) | AES-256-CBC, **IV = 16 zero bytes**, PKCS5/7, key = base64-decode of the api-key | ✅ server decrypted our ciphertext (`validator/set_rule` → `10002 rule is required`) |
 
 **API is v5.6, not v3.** The docs site `<title>` still says v3 — it is stale. Latest
