@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {SaksiPool, IAPassComplianceValidator, Ownable} from "../src/SaksiPool.sol";
 
 /// Stands in for Cleanverse's CVI Compliance Validator. The live contract is called
-/// directly on Monad Ã¢â‚¬â€ see ops/validator.mjs and the deployment notes Ã¢â‚¬â€ so this only has
+/// directly on Monad — see ops/validator.mjs and the deployment notes — so this only has
 /// to reproduce its decision, not its rule engine.
 contract MockValidator {
     mapping(address => bool) public eligible;
@@ -106,7 +106,7 @@ contract SaksiPoolTest is Test {
     function _bind(bytes32 c, uint256 amount) internal pure returns (uint[3] memory s) {
         s[0] = uint256(c) % FIELD;
         s[1] = amount;
-        s[2] = 0;   // entry binding carries no audit context â€” nobody asked a question
+        s[2] = 0;   // entry binding carries no audit context — nobody asked a question
     }
 
     function _deposit(address who, bytes32 c, uint256 amt) internal {
@@ -185,7 +185,7 @@ contract SaksiPoolTest is Test {
     }
 
     /// The two gates are independent. Holding a live credential is not membership of the
-    /// association set the issuer anchored, and vice versa Ã¢â‚¬â€ this is what stops the
+    /// association set the issuer anchored, and vice versa — this is what stops the
     /// register inheriting whichever gate happens to be the weaker one.
     function test_ValidGateOneStillFailsGateTwo() public {
         pool.retireRoot(ROOT);                       // still eligible, no longer in the set

@@ -170,6 +170,33 @@ if (isCli && cmd === "build") {
     })),
   };
   fs.writeFileSync(FILE, JSON.stringify(out, null, 2) + "\n");
+
+  // The public variant. The set is derived from a sandbox shared with every other team,
+  // so most members are other people's wallets. Republishing their addresses and record
+  // ids under our banner would be someone else's data on our site, and it would read as
+  // though they were our users. Worse, we had just finished redacting our OWN
+  // holder mapping — publishing theirs while hiding ours is not a defensible line.
+  //
+  // What survives is what a reader actually needs to check the claim: the leaf values
+  // (which are keccak(address) mod FIELD and do not reverse), the counts, the rule, and
+  // our own labelled members, which are ours to disclose.
+  const ourLabels = new Set(
+    (fs.existsSync(WALLETS) ? JSON.parse(fs.readFileSync(WALLETS, "utf8")) : [])
+      .map((w) => w.address.toLowerCase()),
+  );
+  const publicOut = {
+    ...out,
+    members: out.members.map((m) =>
+      ourLabels.has(m.wallet.toLowerCase())
+        ? m
+        : { index: m.index, sourceKey: m.sourceKey, tier: m.tier, countries: m.countries },
+    ),
+    note:
+      "Members not operated by this project are published as leaves only. The set is built " +
+      "from a sandbox shared across teams; their wallet addresses are not ours to republish.",
+  };
+  fs.writeFileSync(path.join(ROOT, "asp.public.json"), JSON.stringify(publicOut, null, 2) + "\n");
+
   writeDeployment({ aspRoot: out.root, aspBuiltAt: out.builtAt, aspAdmitted: out.admitted });
 
   console.log(`population (active A-Pass on ${CHAIN})   ${population.length}`);

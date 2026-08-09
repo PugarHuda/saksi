@@ -2,19 +2,27 @@
 //
 //   node ops/gate-gap.mjs
 //
-// Gate one is Cleanverse's own Validator, asked live. Gate two is membership of the
-// association set the issuer anchored, proved in zero knowledge. They are not redundant,
-// and the cheapest way to show it is to find an address the two disagree about.
+// Gate one is Cleanverse's own Validator, asked live in the transaction that moves value.
+// Gate two is membership of the association set the issuer anchored, proved in zero
+// knowledge. The difference between them is TIME, and that is the whole argument.
 //
-// The burn address is one. On Monad testnet today, Cleanverse's validator answers that
-// 0x…dEaD satisfies this pool's min_tier 30 rule — someone in the shared sandbox issued
-// it a credential. Gate one admits it. Gate two has no membership witness for it, so no
-// proof exists and it does not get in.
+// A correction worth recording, because we made the mistake and it flattered us. An
+// earlier version of this script pointed at the burn address: Cleanverse's validator
+// answers that 0x…dEaD satisfies this pool's rule, because somebody in the shared sandbox
+// issued it a credential, while our set had no witness for it. We presented that as proof
+// the second gate catches what the first misses.
 //
-// The honest half of the same result: 0x1111…1111 IS in our set, because it is in the
-// registry. The association set is faithful to Cleanverse, not cleaner than it. What the
-// second gate adds is not better identity data — it is a second, independent question,
-// anchored by the issuer at a point in time, that an address has to satisfy as well.
+// It was not. Our set was missing roughly seven eighths of the eligible population — a
+// server-side status filter on a column that is null for most rows — and 0x…dEaD was
+// excluded by that bug, not by any property of the design. With the population enumerated
+// correctly the two gates agree about it, exactly as they should: the set is FAITHFUL to
+// the registry, never cleaner than it.
+//
+// The real divergence is temporal, and it is the one that matters. The anchored root is a
+// snapshot; credentials move continuously. A holder frozen after the last rotation is
+// refused by the live call while still carrying a witness in the anchored root — and a
+// holder credentialed after it passes the live call with no witness at all. Neither gate
+// subsumes the other, and this table shows both directions against the previous set.
 
 import "./env.mjs";
 import fs from "node:fs";
@@ -38,6 +46,14 @@ const call = (to, sig, ...args) =>
 const inSet = (addr) =>
   asp.members.some((m) => m.wallet.toLowerCase() === addr.toLowerCase());
 
+// The set as it stood before the last rebuild. Between a credential changing and the root
+// rotating, this is what the pool was still accepting proofs against — the window the live
+// gate exists to close.
+const prevPath = path.join(ROOT, "asp.previous.json");
+const prev = fs.existsSync(prevPath) ? JSON.parse(fs.readFileSync(prevPath, "utf8")) : null;
+const inPrevSet = (addr) =>
+  !!prev && prev.members.some((m) => m.wallet.toLowerCase() === addr.toLowerCase());
+
 const label = (addr) =>
   wallets.find((w) => w.address.toLowerCase() === addr.toLowerCase())?.label ?? "";
 
@@ -57,7 +73,9 @@ console.log(`validator ${dep.validator}   (Cleanverse's contract, not ours)`);
 console.log(`asp root  ${asp.root}`);
 console.log(`          ${asp.admitted} members, built ${asp.builtAt}\n`);
 
-const head = ["subject", "", "gate 1 · Cleanverse", "gate 2 · association set", "admitted?"];
+const head = [
+  "subject", "", "gate 1 · Cleanverse", "gate 2 · set now", "gate 2 · set before rebuild", "admitted?",
+];
 const rows = [head, head.map((h) => "-".repeat(Math.max(h.length, 3)))];
 
 for (const [addr, name] of SUBJECTS) {
@@ -74,6 +92,7 @@ for (const [addr, name] of SUBJECTS) {
     name || label(addr),
     gate1 === null ? "reverted" : gate1 ? "ADMITS" : "refuses",
     gate2 ? "ADMITS" : "no witness",
+    prev ? (inPrevSet(addr) ? "ADMITS" : "no witness") : "—",
     gate1 && gate2 ? "yes" : "no",
   ]);
 }
@@ -81,14 +100,26 @@ for (const [addr, name] of SUBJECTS) {
 const w = head.map((_, i) => Math.max(...rows.map((r) => (r[i] ?? "").length)));
 for (const r of rows) console.log(r.map((c, i) => (c ?? "").padEnd(w[i])).join("  "));
 
-// Only a real answer counts as disagreement. A reverted call is an unknown, and folding
-// unknowns into the headline would inflate the one number this table exists to report.
-const disagreements = rows
-  .slice(2)
-  .filter((r) => r[2] !== "reverted" && (r[2] === "ADMITS") !== (r[3] === "ADMITS"));
+// Only a real answer counts. A reverted call is an unknown, and folding unknowns into the
+// headline would inflate the one number this table exists to report.
+const answered = rows.slice(2).filter((r) => r[2] !== "reverted");
+const nowDisagree = answered.filter((r) => (r[2] === "ADMITS") !== (r[3] === "ADMITS"));
+const staleWindow = answered.filter((r) => r[2] === "refuses" && r[4] === "ADMITS");
 
-console.log(`\n${disagreements.length} address(es) the two gates disagree about.`);
-if (disagreements.length) {
-  console.log("Each one is a case a single-gate register would have got wrong in one direction");
-  console.log("or the other. That is the argument for building both.");
+console.log(`\nagainst the CURRENT set:  ${nowDisagree.length} disagreement(s)`);
+console.log(`against the PREVIOUS set: ${staleWindow.length} holder(s) the live gate refuses`);
+console.log(`                          but the older anchored root still admits\n`);
+
+if (staleWindow.length) {
+  console.log("That second number is the argument. Each of those holders had a valid membership");
+  console.log("witness under the root the pool was accepting proofs against, and only the live");
+  console.log("call to Cleanverse refused them. Between a credential changing and the issuer");
+  console.log("rotating the root, the anchored set is stale by construction — the live gate is");
+  console.log("what closes that window, and the anchored set is what survives an operator who");
+  console.log("never rotates. Neither subsumes the other.");
+} else {
+  console.log("The set was rebuilt after the last credential change, so no holder is currently");
+  console.log("caught in the window. Freeze a credential without rotating the root to see it.");
 }
+console.log("\nThe set is faithful to the registry, never cleaner than it: an address Cleanverse");
+console.log("credentials is an address this set admits.");

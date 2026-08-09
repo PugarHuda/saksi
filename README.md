@@ -8,7 +8,7 @@
 A confidential holder register for tokenized real-world assets.
 Built on Cleanverse CVI and CVA · deployed on Monad testnet.
 
-[Live console](https://saksi-gilt.vercel.app) · [Pool on explorer](https://testnet.monadexplorer.com/address/0x9BB3af71497304506Be2810915016742394f72f2) · [One-page summary](SUMMARY.md)
+[Live console](https://saksi-gilt.vercel.app) · [Pool on explorer](https://testnet.monadexplorer.com/address/0x6F0161A3838d2025e9953cfb37F92abB7ca7E761) · [One-page summary](SUMMARY.md)
 
 </div>
 
@@ -21,15 +21,15 @@ is that a public chain is pseudonymous, so this costs nothing. We checked.
 
 ```
 $ node ops/measure-register.mjs
-545 credentialed wallets × every CVA on Monad — an exhaustive census, not a sample
+562 credentialed wallets × every CVA on Monad — an exhaustive census, not a sample
 
-median holders per asset                       2
-held by exactly one wallet                     2
-fewer than five holders                        6 of 9   (67%)
-one wallet holding 90%+ of the counted supply  3
+median holders per asset                       3
+held by exactly one wallet                     9
+fewer than five holders                       35 of 45  (78%)
+one wallet holding 90%+ of the counted supply 16
 ```
 
-An anonymity set of two is not anonymity. Knowing the asset and watching one transfer
+An anonymity set of three is not anonymity. Knowing the asset and watching one transfer
 identifies the position and its size.
 
 This is not an artefact of a quiet testnet — it is the mechanism. **The tighter an
@@ -114,7 +114,7 @@ Monad testnet, chain `10143`.
 
 | | Address |
 |---|---|
-| **SaksiPool** | [`0x9BB3af71497304506Be2810915016742394f72f2`](https://testnet.monadexplorer.com/address/0x9BB3af71497304506Be2810915016742394f72f2) |
+| **SaksiPool** | [`0x6F0161A3838d2025e9953cfb37F92abB7ca7E761`](https://testnet.monadexplorer.com/address/0x6F0161A3838d2025e9953cfb37F92abB7ca7E761) |
 | **Saksi Series A Note** (our CVA, `SAKSIAZEV`) | [`0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B`](https://testnet.monadexplorer.com/address/0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B) |
 | Cleanverse CVI Compliance Validator | `0xaC7e5179C2C7f03f209136886c172eb34F161792` |
 | complianceVerifier | `0xd9911689e884598f563fffa6e3d2166963d731fd` |
@@ -127,33 +127,45 @@ Monad testnet, chain `10143`.
 Read the live state yourself:
 
 ```bash
-cast call 0x9BB3af71497304506Be2810915016742394f72f2 "registeredWithValidator()(bool)" --rpc-url https://testnet-rpc.monad.xyz
-cast call 0x9BB3af71497304506Be2810915016742394f72f2 "activeRules()((bytes2,bytes2,uint8,uint8,uint256)[])" --rpc-url https://testnet-rpc.monad.xyz
-cast call 0x9BB3af71497304506Be2810915016742394f72f2 "isEligible(address)(bool)" 0x4490CcB0abdE3D2E494dE5cC118F7D0D74b44639 --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x6F0161A3838d2025e9953cfb37F92abB7ca7E761 "registeredWithValidator()(bool)" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x6F0161A3838d2025e9953cfb37F92abB7ca7E761 "activeRules()((bytes2,bytes2,uint8,uint8,uint256)[])" --rpc-url https://testnet-rpc.monad.xyz
+cast call 0x6F0161A3838d2025e9953cfb37F92abB7ca7E761 "isEligible(address)(bool)" 0x4490CcB0abdE3D2E494dE5cC118F7D0D74b44639 --rpc-url https://testnet-rpc.monad.xyz
 ```
 
 ## Three demonstrations
 
 **1. The question comes first.** Four disclosure types, all verified on-chain, in
-[`audit-log.json`](audit-log.json). Every request block precedes its answer block — 52157468
-asks, 52157475 answers — which anyone can check with an RPC endpoint and no access to this
+[`audit-log.json`](audit-log.json). Every request block precedes its answer block — 52190311
+asks, 52190320 answers — which anyone can check with an RPC endpoint and no access to this
 repo. The strongest row is a failure: asked whether total exposure across four positions
-was at most 1,000 when it was in fact 1,150, **no proof could be produced**, and request
-`52163014` is still open. The register cannot answer falsely; it can only fail to answer.
+was at most 1,000 when it was in fact 1,545, **no proof could be produced**, and request
+`52190425` is still open. The register cannot answer falsely; it can only fail to answer.
 
-**2. Why two gates.** `node ops/gate-gap.mjs` finds an address the gates disagree about.
-Cleanverse's own validator answers that the **burn address** satisfies this pool's rule —
-someone in the shared sandbox issued `0x…dEaD` a credential, and `complianceVerify` returns
-true for it today. Gate one admits it; gate two has no membership witness, so it does not
-enter. The honest half of the same result: `0x1111…1111` *is* in our set, because it is in
-the registry. The set is faithful to Cleanverse, not cleaner than it.
+**2. Why two gates.** The difference between them is *time*. `node ops/gate-gap.mjs`
+compares each subject against the live validator, the current association set, and the set
+as it stood before the last rebuild:
+
+```
+0x8F0aa538…046067   treasury    refuses    no witness    ADMITS (previous root)
+```
+
+That holder's credential was withdrawn at Cleanverse. Until the issuer rebuilt and rotated,
+they still carried a valid membership witness under the root the pool was accepting proofs
+against, and only the live call refused them. The live gate closes that window; the anchored
+set is what still binds when an operator never rotates. Neither subsumes the other.
+
+> An earlier version of this section pointed at the burn address instead, claiming the ZK
+> gate caught what the live gate missed. That was wrong. Our association set was missing
+> seven eighths of the eligible population because of a status filter, and `0x…dEaD` fell
+> out because of the bug rather than the design. With the population enumerated correctly
+> the two gates agree about it. **The set is faithful to the registry, never cleaner.**
 
 **3. Revoke and freeze.** A verified holder deposited, then had its A-Pass frozen
 (`update_status` → live record `status: 2`). Both gates closed independently:
 `complianceVerify(pool, holder)` on Cleanverse's validator went `true → false`, and the
-association set rebuilt 47 → 46 without it — recorded in `asp.json` as
-`dropped: [{ label: "family", … }]`, with the previous set kept in `asp.previous.json`.
-The next deposit reverts `ValidatorRefused(0xa132…)` at gate one and has no witness at gate
+association set rebuilt 519 → 518 without it — recorded in `asp.json` as
+`dropped: [{ label: "treasury", … }]`, with the previous set kept in `asp.previous.json`.
+The next deposit reverts `ValidatorRefused(0x8F0a…)` at gate one and has no witness at gate
 two.
 
 > `isEligible(address)` is **Saksi's** view on the pool, which forwards to Cleanverse's
@@ -163,7 +175,7 @@ two.
 ## Repository
 
 ```
-contracts/     Foundry. SaksiPool + the seven exported Groth16 verifiers. 34 tests.
+contracts/     Foundry. SaksiPool + the seven exported Groth16 verifiers. 44 tests.
 circuits/      Circom sources, proving keys, witness calculators.
 ops/           The register's operations — issuance, association set, validator
                registration, deposits, disclosures, revocation.
@@ -175,7 +187,7 @@ docs/          Cleanverse API notes, findings, the business plan.
 
 ```bash
 # contracts
-cd contracts && forge test          # 34 passed
+cd contracts && forge test          # 44 passed
 
 # ops — needs CV_API_ID / CV_API_KEY and a funded Monad key in .env
 node ops/smoke.mjs                  # live sandbox check

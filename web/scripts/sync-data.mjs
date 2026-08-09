@@ -11,9 +11,19 @@ const root = path.resolve(web, "..");
 const out = path.join(web, "public", "data");
 fs.mkdirSync(out, { recursive: true });
 
-const files = ["deployment.json", "asp.json", "audit-log.json", "notes.json", "measurement.json"];
-for (const f of files) {
-  const src = path.join(root, f);
+// asp.public.json, not asp.json: the raw set carries other teams' wallet addresses and
+// record ids, which are not ours to publish. See the note in ops/asp.mjs.
+const files = [
+  "deployment.json",
+  ["asp.public.json", "asp.json"],
+  "audit-log.json",
+  "notes.json",
+  "measurement.json",
+];
+for (const entry of files) {
+  // A pair means "read this, publish it under that name".
+  const [from, f] = Array.isArray(entry) ? entry : [entry, entry];
+  const src = path.join(root, from);
   const dst = path.join(out, f);
 
   // On a build host only `web/` is uploaded, so the repo-root sources are absent. The

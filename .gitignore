@@ -24,3 +24,7 @@ docs/docs-cleanverse.txt
 # Proof artifacts carry the same opening secrets as notes.json.
 .artifacts/
 contracts/.artifacts/
+
+# The raw association set carries other teams' wallets; asp.public.json is published.
+asp.json
+asp.previous.json

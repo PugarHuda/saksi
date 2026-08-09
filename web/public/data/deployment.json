@@ -14,10 +14,10 @@
     "countries": []
   },
   "atokenAdmin": "0x5C229A479db6756780e36935aE4917B9f3C6D527",
-  "aspRoot": "16547745995311398113241067661978890218447839168620346059165817818380397534680",
-  "aspBuiltAt": "2026-08-09T06:29:03.715Z",
-  "aspAdmitted": 46,
-  "pool": "0x9BB3af71497304506Be2810915016742394f72f2",
+  "aspRoot": "886120167273977104912452806806289443656768018160646530317210140063666085547",
+  "aspBuiltAt": "2026-08-09T08:40:16.965Z",
+  "aspAdmitted": 518,
+  "pool": "0x6F0161A3838d2025e9953cfb37F92abB7ca7E761",
   "verifiers": {
     "compliance": "0xd9911689e884598f563fffa6e3d2166963d731fd",
     "transfer": "0xa98cee28c6eb35b6ee7440b7490e265f23975d61",
@@ -32,7 +32,7 @@
   "issuerDepositAddress": "0x09e5D940573AF07C95761aD2882A5fda5Ae3144E",
   "chainId": 10143,
   "explorer": "https://testnet.monadexplorer.com",
-  "validatorRegisterTx": "0x4288e8450e3838b722499c10a77ae744b3a053211f946989ebf36a2af2909dcb",
+  "validatorRegisterTx": "0xcca27d9b21185a237c12afa235ff154a07b98f631484bc33cbdd8b3715d23510",
   "validatorRule": {
     "allowed_group": "",
     "allowed_sub_group": "",
@@ -47,7 +47,9 @@
   "assetDecimals": 6,
   "poolHistory": [
     "0xDaDA618e564EdAF7ec0AF0a12575BF3C0dc8523b",
-    "0xfbbdcf79c34f264f55e8843a4bc8cd127e3732cb"
+    "0xfbbdcf79c34f264f55e8843a4bc8cd127e3732cb",
+    "0x9BB3af71497304506Be2810915016742394f72f2",
+    "0x799A76e2494f8db92bC00Ccf4eBFF39063A2454b"
   ],
   "auditor": "0x63CB403b716111c249d4D11312c15c5744CcC4e4",
   "auditorSetTx": "0x63b23d1a1925679a70abd67f81f3d9ab651bbe47b9f1c9a2586f99f49bc5b838"

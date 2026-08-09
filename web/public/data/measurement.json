@@ -1,16 +1,16 @@
 {
   "chain": "monad",
-  "headBlock": 52171990,
-  "measuredAt": "2026-08-09T07:13:25.388Z",
+  "headBlock": 52181672,
+  "measuredAt": "2026-08-09T08:36:07.387Z",
   "method": "exhaustive census: balanceOf for every wallet holding an active A-Pass, against every A-Token on this chain. A CVA transfer requires a credential on both sides, so the credentialed set is the complete set of possible holders.",
-  "caveat": "counts only credentials active at measurement time; can only undercount, so the anonymity sets reported are upper bounds",
-  "walletsEnumerated": 545,
-  "tokensEnumerated": 42,
-  "assetsWithHolders": 9,
-  "medianHolders": 2,
-  "singleHolderAssets": 2,
-  "assetsUnderFiveHolders": 6,
-  "assetsWithDominantHolder": 3,
+  "caveat": "the census can only miss holders, never invent them, so every count is a floor: the true anonymity set is at least this large and the real picture at most this exposed",
+  "walletsEnumerated": 562,
+  "tokensEnumerated": 104,
+  "assetsWithHolders": 45,
+  "medianHolders": 3,
+  "singleHolderAssets": 9,
+  "assetsUnderFiveHolders": 35,
+  "assetsWithDominantHolder": 16,
   "assets": [
     {
       "symbol": "NCN26",
@@ -27,11 +27,81 @@
       "supply": "100000000"
     },
     {
+      "symbol": "VMON42027",
+      "token": "0x73bc94ceed0fd7f1052d79bf181f685b2d4b246b",
+      "holders": 1,
+      "topShare": 100,
+      "supply": "1000000000"
+    },
+    {
+      "symbol": "CVN173AA2B7D",
+      "token": "0xe821f58b1f393a46cc3cd9ba420a19c2ef62a2ec",
+      "holders": 1,
+      "topShare": 100,
+      "supply": "100000000"
+    },
+    {
+      "symbol": "CLNOTE03",
+      "token": "0x2784aabf69387481103dd80aad32357049dd51dd",
+      "holders": 1,
+      "topShare": 100,
+      "supply": "1000"
+    },
+    {
+      "symbol": "RCP342535",
+      "token": "0x43ad32d181b0b673cb782d8e379b3dfff4dacfdc",
+      "holders": 1,
+      "topShare": 100,
+      "supply": "1"
+    },
+    {
+      "symbol": "CWRS02",
+      "token": "0x45ffb672188008ca942e08c85d93d460948ebdec",
+      "holders": 1,
+      "topShare": 100,
+      "supply": "10000000"
+    },
+    {
+      "symbol": "CWRS01",
+      "token": "0x56bc7d32d09e52e8091ede433dbaab554401ace6",
+      "holders": 1,
+      "topShare": 100,
+      "supply": "10000000"
+    },
+    {
+      "symbol": "SPTFIX0728",
+      "token": "0x0e0d08c6d00b7e83084b577f9a6874be439e6d00",
+      "holders": 1,
+      "topShare": 100,
+      "supply": "1000000000"
+    },
+    {
       "symbol": "SAKSIAZEV",
       "token": "0xb9c53b57cd47bd3b55143647bef8297d1c5f4d6b",
       "holders": 2,
       "topShare": 99.77,
       "supply": "1000000000000"
+    },
+    {
+      "symbol": "KLYG",
+      "token": "0xe468bace878b5b9159ffe248dff3be155b84da08",
+      "holders": 2,
+      "topShare": 86.15,
+      "supply": "650000000000000000000"
+    },
+    {
+      "symbol": "CWRS03",
+      "token": "0x0edd0c78ec0538ffc5486fd51364ea69c4d82f36",
+      "holders": 2,
+      "topShare": 75,
+      "supply": "20000000"
+    },
+    {
+      "symbol": "KLYUSD",
+      "token": "0xbd8f3d57c8d06a321c36e2cdcdcf9cbca4592af0",
+      "holders": 2,
+      "topShare": 66.66,
+      "supply": "30000000000000000000"
     },
     {
       "symbol": "VL47966050",
@@ -41,11 +111,11 @@
       "supply": "3000000"
     },
     {
-      "symbol": "KLYUSD",
-      "token": "0xbd8f3d57c8d06a321c36e2cdcdcf9cbca4592af0",
+      "symbol": "hNVDA",
+      "token": "0x8b446f35763a56ca84168e31603cb46f08540821",
       "holders": 2,
-      "topShare": 50,
-      "supply": "20000000000000000000"
+      "topShare": 64.88,
+      "supply": "3220869"
     },
     {
       "symbol": "NUSD26",
@@ -53,6 +123,167 @@
       "holders": 2,
       "topShare": 50,
       "supply": "60000000"
+    },
+    {
+      "symbol": "NUSD",
+      "token": "0xa61a65dcad1ed9ac905891819f72ad15df4acab1",
+      "holders": 2,
+      "topShare": 50,
+      "supply": "900000000"
+    },
+    {
+      "symbol": "mEURW",
+      "token": "0x1021e5ffac9a9e6e01d34eef9198fe68d597c998",
+      "holders": 2,
+      "topShare": 50,
+      "supply": "2000000000000000000000"
+    },
+    {
+      "symbol": "mSYRUP",
+      "token": "0xf20b0fb563a94d095dbc8d1ed084dac3f3253a92",
+      "holders": 2,
+      "topShare": 50,
+      "supply": "2000000000000000000000"
+    },
+    {
+      "symbol": "hUSD",
+      "token": "0x3db7f8e2672ff348bbd5ab27d873d012968c2bf7",
+      "holders": 3,
+      "topShare": 99.08,
+      "supply": "1010000000000"
+    },
+    {
+      "symbol": "TRT003",
+      "token": "0x89d4513154277359343b959043a4886f646521d7",
+      "holders": 3,
+      "topShare": 98.03,
+      "supply": "510000000000"
+    },
+    {
+      "symbol": "CWUSD",
+      "token": "0x1a3225eb4d5eb81fcffd9cf5b554cfa3d02bad40",
+      "holders": 3,
+      "topShare": 90.22,
+      "supply": "11000000000"
+    },
+    {
+      "symbol": "CLUSD",
+      "token": "0x09a050eb813ddb0b1eeae7bca83bc1becd04fa31",
+      "holders": 3,
+      "topShare": 78.04,
+      "supply": "2050000000"
+    },
+    {
+      "symbol": "RWRN01",
+      "token": "0x7a33e03b10268ffdb50e562721b092bc0cb793f9",
+      "holders": 3,
+      "topShare": 77.27,
+      "supply": "100000000"
+    },
+    {
+      "symbol": "ASSAYUSD",
+      "token": "0x9262c5fda15665d02dac9d8b6df02903be77375f",
+      "holders": 3,
+      "topShare": 60.5,
+      "supply": "1000000000"
+    },
+    {
+      "symbol": "mCETES",
+      "token": "0x267c086e387a0fc9835a6a372f27795ff3af5b83",
+      "holders": 3,
+      "topShare": 50,
+      "supply": "2000000000000000000000"
+    },
+    {
+      "symbol": "NCN",
+      "token": "0x9116fecff44b30628da601a4f4ee53d65b8d2a4c",
+      "holders": 3,
+      "topShare": 43.33,
+      "supply": "300000000"
+    },
+    {
+      "symbol": "CLDT01",
+      "token": "0x4727a40d36cda8505c42cafaad262bcf22abaeeb",
+      "holders": 3,
+      "topShare": 42.85,
+      "supply": "7000000"
+    },
+    {
+      "symbol": "CLNOTE02",
+      "token": "0xdaa42e5c1a8b9724f499729609f166b0d140ec18",
+      "holders": 4,
+      "topShare": 99.97,
+      "supply": "1000488"
+    },
+    {
+      "symbol": "mUSDCA2M282",
+      "token": "0x8602d979accfa6c089fec00519891b475c4a4412",
+      "holders": 4,
+      "topShare": 97.97,
+      "supply": "255000000000"
+    },
+    {
+      "symbol": "SRUSD4097",
+      "token": "0x738ae23180cbe03d761a3938ec48f1cd786512f0",
+      "holders": 4,
+      "topShare": 60.9,
+      "supply": "1000000000"
+    },
+    {
+      "symbol": "CLLAT01",
+      "token": "0x13adf50039db284b380f06fd4be0061c30a92c96",
+      "holders": 4,
+      "topShare": 54.54,
+      "supply": "11000000000000000500"
+    },
+    {
+      "symbol": "CLINV01",
+      "token": "0xeae6ef4f62b735789bd0d899f5f6f2993488fe69",
+      "holders": 4,
+      "topShare": 50,
+      "supply": "12000000000000000000"
+    },
+    {
+      "symbol": "SBND",
+      "token": "0x90354d344a2c0207f6f3af4d698c5c83cddbf214",
+      "holders": 4,
+      "topShare": 39.56,
+      "supply": "4982000000000000000000"
+    },
+    {
+      "symbol": "CRAIL4791",
+      "token": "0x5813d568ebfc92f2610aa676896d05a6d68436cb",
+      "holders": 4,
+      "topShare": 34.19,
+      "supply": "293131000000"
+    },
+    {
+      "symbol": "SPNS01",
+      "token": "0xa17eab812000679fe3c87a0c4a29cf8a0714a7bd",
+      "holders": 5,
+      "topShare": 73.33,
+      "supply": "15000000"
+    },
+    {
+      "symbol": "RVS",
+      "token": "0x3b4ef029bef7750f6f8ce81986e51f539ac389de",
+      "holders": 5,
+      "topShare": 22.65,
+      "supply": "44980"
+    },
+    {
+      "symbol": "mXAUt0",
+      "token": "0x9e699bdaf6cedeb7ca2417574a9f64cdea4f3d1a",
+      "holders": 6,
+      "topShare": 49.99,
+      "supply": "2000000000000000000000"
+    },
+    {
+      "symbol": "CCUSD2",
+      "token": "0xe7d2777603d82cf002278c8ada2498743e5e2ec1",
+      "holders": 6,
+      "topShare": 47.36,
+      "supply": "203000000000"
     },
     {
       "symbol": "QNOTE",
@@ -69,11 +300,32 @@
       "supply": "60000000"
     },
     {
-      "symbol": "ausdc",
-      "token": "0xac0893567d43c3e7e6e35a72803df05416c1f20d",
-      "holders": 49,
-      "topShare": 27.03,
-      "supply": "552140000"
+      "symbol": "TLNB",
+      "token": "0xbae642890988c3ef56e77fb041afd847a6131d64",
+      "holders": 9,
+      "topShare": 28.71,
+      "supply": "69660"
+    },
+    {
+      "symbol": "cvUSD",
+      "token": "0x5e7ca7ec42a11b4f5259fc429acd32dfff83796d",
+      "holders": 11,
+      "topShare": 99.5,
+      "supply": "20000000"
+    },
+    {
+      "symbol": "cvaUSD",
+      "token": "0x01926a2fb91bfe75347a5495123fbc1a85aacf0b",
+      "holders": 14,
+      "topShare": 18.18,
+      "supply": "5500000000000"
+    },
+    {
+      "symbol": "OPRACVA3275",
+      "token": "0x6a7942b254f84822f7237c6c14ad78a00a22bc4e",
+      "holders": 26,
+      "topShare": 23.12,
+      "supply": "8020000000000"
     }
   ]
 }
