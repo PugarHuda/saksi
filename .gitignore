@@ -47,3 +47,7 @@ web/CLAUDE.md
 # Per-holder ledgers carry that holder spending key.
 notes.*.json
 !notes.public.json
+
+# Playwright run output, not source.
+web/test-results/
+web/playwright-report/
