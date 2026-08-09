@@ -48,5 +48,7 @@
   "poolHistory": [
     "0xDaDA618e564EdAF7ec0AF0a12575BF3C0dc8523b",
     "0xfbbdcf79c34f264f55e8843a4bc8cd127e3732cb"
-  ]
+  ],
+  "auditor": "0x63CB403b716111c249d4D11312c15c5744CcC4e4",
+  "auditorSetTx": "0x63b23d1a1925679a70abd67f81f3d9ab651bbe47b9f1c9a2586f99f49bc5b838"
 }

@@ -27,15 +27,21 @@ import { loadNotes, FIELD } from "./note.mjs";
 import { ROOT, RPC, readDeployment } from "./env.mjs";
 
 const dep = readDeployment();
-const pk = process.env.DEPLOYER_PK;
 const AGG_SLOTS = 5;
+
+// The auditor is a different party from the issuer, and must be: an issuer registering
+// its own question and then answering it demonstrates the mechanism but proves nothing
+// about separation. requestAudit() is sent from the auditor's key; the disclosure that
+// answers it is sent from the holder's.
+const auditorPk = process.env.AUDITOR_PK ?? process.env.DEPLOYER_PK;
+const pk = process.env.DEPLOYER_PK;
 
 const CAST = fs.existsSync(path.join(process.env.USERPROFILE ?? "", ".foundry", "bin", "cast.exe"))
   ? path.join(process.env.USERPROFILE, ".foundry", "bin", "cast.exe")
   : "cast";
 const cast = (args) => execFileSync(CAST, args, { encoding: "utf8" });
-const send = (args) => {
-  const out = cast(["send", ...args, "--rpc-url", RPC, "--chain", "10143", "--private-key", pk]);
+const send = (args, key = pk) => {
+  const out = cast(["send", ...args, "--rpc-url", RPC, "--chain", "10143", "--private-key", key]);
   const tx = /transactionHash\s+(0x[0-9a-f]+)/.exec(out)?.[1];
   const ok = /status\s+1/.test(out);
   return { tx, ok, out };
@@ -59,8 +65,11 @@ async function proveAndSend({ circuit, input, selector, sig, question, ctx, kind
   const { wasm, zkey, vkey } = build(circuit);
 
   console.log(`\nregulator registers the question on-chain first`);
-  const req = send([dep.pool, "requestAudit(uint256,string)", ctx.toString(), question]);
-  console.log(`  requestAudit  ${req.ok ? "ok" : "FAILED"}  ${req.tx}`);
+  const req = send([dep.pool, "requestAudit(uint256,string)", ctx.toString(), question], auditorPk);
+  console.log(
+    `  requestAudit  ${req.ok ? "ok" : "FAILED"}  ${req.tx}` +
+    (auditorPk === pk ? "   (WARNING: signed by the issuer's own key)" : "   signed by the auditor"),
+  );
 
   console.log(`proving (${circuit})…`);
   const t0 = Date.now();

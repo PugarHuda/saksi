@@ -30,16 +30,22 @@ for (const f of files) {
   }
   let data = JSON.parse(fs.readFileSync(src, "utf8"));
 
-  // notes.json holds the secrets that open each commitment. The console only needs to
-  // know a position exists and when it entered — never how to open it.
+  // notes.json holds the secrets that open each commitment, and the wallet that created
+  // it. The console renders the holder column as shielded, so shipping the mapping in
+  // the same bundle would make the interface contradict itself. It publishes that a
+  // position exists and when — never who, and never how to open it.
+  //
+  // Note honestly: entry is public by construction. The deposit transaction has a
+  // visible sender and moves a visible ERC-20 amount, so anyone reading the chain can
+  // reconstruct this mapping for the entry itself. What the register conceals is the
+  // book AFTER positions move, which is where a JoinSplit breaks the link. Withholding
+  // it here is about not doing the observer's work for them, not about a guarantee.
   if (f === "notes.json") {
     data = data.map((n) => ({
       commitment: n.commitment,
-      wallet: n.wallet,
       depositTx: n.depositTx,
       provedAt: n.provedAt,
       aspRoot: n.aspRoot,
-      leafIndex: n.leafIndex,
     }));
   }
   fs.writeFileSync(dst, JSON.stringify(data, null, 2));

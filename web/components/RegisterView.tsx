@@ -136,11 +136,11 @@ export default function RegisterView({
               <thead>
                 <tr>
                   <th scope="col">Commitment</th>
-                  <th scope="col">Amount</th>
-                  <th scope="col">Holder</th>
+                  <th scope="col">Amount held</th>
+                  <th scope="col">Current holder</th>
                   <th scope="col">Admitted under root</th>
                   <th scope="col">Entered</th>
-                  <th scope="col">Tx</th>
+                  <th scope="col">Entry tx</th>
                 </tr>
               </thead>
               <tbody>
@@ -173,6 +173,17 @@ export default function RegisterView({
           A conventional RWA platform publishes this table with real names and real numbers in
           the last two columns. That is the disclosure institutions will not accept — and the
           reason tokenized private credit stays on permissioned ledgers.
+        </p>
+
+        <p className="note" style={{ marginTop: 12 }}>
+          <strong>Where the shielding starts, precisely.</strong> Entry is public by
+          construction: a deposit transaction has a visible sender and moves a visible ERC-20
+          amount, so the chain already links this commitment to the wallet that opened it. What
+          the register conceals is the book <em>after</em> positions move — a JoinSplit spends
+          notes and creates new ones without publishing an amount or an owner, so who holds
+          what stops tracking who deposited what. We do not publish the entry mapping in this
+          bundle either, but that is courtesy rather than a guarantee, and it would be
+          dishonest to present it as one.
         </p>
       </section>
     </div>

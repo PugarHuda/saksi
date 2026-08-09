@@ -73,9 +73,7 @@ export type Measurement = {
 
 export type Position = {
   commitment: string;
-  wallet: string;
   depositTx?: string;
   provedAt: string;
   aspRoot: string;
-  leafIndex: number;
 };

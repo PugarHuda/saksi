@@ -5,7 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {SaksiPool, IAPassComplianceValidator, Ownable} from "../src/SaksiPool.sol";
 
 /// Stands in for Cleanverse's CVI Compliance Validator. The live contract is called
-/// directly on Monad — see ops/validator.mjs and the deployment notes — so this only has
+/// directly on Monad â€” see ops/validator.mjs and the deployment notes â€” so this only has
 /// to reproduce its decision, not its rule engine.
 contract MockValidator {
     mapping(address => bool) public eligible;
@@ -100,12 +100,21 @@ contract SaksiPoolTest is Test {
         p[10] = uint256(commitment) % FIELD;
     }
 
+    /// The value-binding signals: [commitment, disclosedAmount, contextHash]. The real
+    /// proof opens the commitment and shows it contains exactly this amount; here the
+    /// mock verifier stands in for the pairing, so only the pinning is under test.
+    function _bind(bytes32 c, uint256 amount) internal pure returns (uint[3] memory s) {
+        s[0] = uint256(c) % FIELD;
+        s[1] = amount;
+        s[2] = 0;   // entry binding carries no audit context — nobody asked a question
+    }
+
     function _deposit(address who, bytes32 c, uint256 amt) internal {
         // Build the signals first: _pub() calls into the pool, and an external call
         // would otherwise consume the prank before deposit() ever sees it.
         uint[11] memory p = _pub(who, c);
         vm.prank(who);
-        pool.deposit(amt, c, pA, pB, pC, p);
+        pool.deposit(amt, c, pA, pB, pC, p, pA, pB, pC, _bind(c, amt));
     }
 
     /// A withdrawal of `out` to `to`, spending two notes and creating two.
@@ -138,7 +147,29 @@ contract SaksiPoolTest is Test {
         uint[11] memory p = _pub(holder, bytes32(uint256(2)));
         vm.prank(address(0xBEEF));
         vm.expectRevert(SaksiPool.SourceKeyMismatch.selector);
-        pool.deposit(100e6, bytes32(uint256(2)), pA, pB, pC, p);
+        pool.deposit(100e6, bytes32(uint256(2)), pA, pB, pC, p, pA, pB, pC, _bind(bytes32(uint256(2)), 100e6));
+    }
+
+    /// The attack the value binding exists to stop: transfer one unit, commit to a
+    /// million. Eligibility passes, membership passes, and without this check the
+    /// register would insert a note worth a million against a unit of backing.
+    function test_CommitmentMustOpenToTheAmountTransferred() public {
+        bytes32 c = bytes32(uint256(0xB1AD));
+        uint[11] memory p = _pub(holder, c);
+        uint[3] memory forged = _bind(c, 1_000_000e6);   // proof says a million
+        vm.prank(holder);
+        vm.expectRevert(SaksiPool.AmountNotBound.selector);
+        pool.deposit(1, c, pA, pB, pC, p, pA, pB, pC, forged);   // one unit actually moves
+    }
+
+    /// The binding proof must be about the note being inserted, not a different one.
+    function test_BindingProofMustNameThisCommitment() public {
+        bytes32 c = bytes32(uint256(0xB2AD));
+        uint[11] memory p = _pub(holder, c);
+        uint[3] memory other = _bind(bytes32(uint256(0xDEAD)), 100e6);
+        vm.prank(holder);
+        vm.expectRevert(SaksiPool.CommitmentNotBound.selector);
+        pool.deposit(100e6, c, pA, pB, pC, p, pA, pB, pC, other);
     }
 
     // ---- gate one: Cleanverse's Validator ---------------------------------
@@ -150,18 +181,18 @@ contract SaksiPoolTest is Test {
         uint[11] memory p = _pub(holder, bytes32(uint256(12)));
         vm.prank(holder);
         vm.expectRevert(abi.encodeWithSelector(SaksiPool.ValidatorRefused.selector, holder));
-        pool.deposit(100e6, bytes32(uint256(12)), pA, pB, pC, p);
+        pool.deposit(100e6, bytes32(uint256(12)), pA, pB, pC, p, pA, pB, pC, _bind(bytes32(uint256(12)), 100e6));
     }
 
     /// The two gates are independent. Holding a live credential is not membership of the
-    /// association set the issuer anchored, and vice versa — this is what stops the
+    /// association set the issuer anchored, and vice versa â€” this is what stops the
     /// register inheriting whichever gate happens to be the weaker one.
     function test_ValidGateOneStillFailsGateTwo() public {
         pool.retireRoot(ROOT);                       // still eligible, no longer in the set
         uint[11] memory p = _pub(holder, bytes32(uint256(13)));
         vm.prank(holder);
         vm.expectRevert(SaksiPool.UnknownRoot.selector);
-        pool.deposit(100e6, bytes32(uint256(13)), pA, pB, pC, p);
+        pool.deposit(100e6, bytes32(uint256(13)), pA, pB, pC, p, pA, pB, pC, _bind(bytes32(uint256(13)), 100e6));
     }
 
     /// Leaving is an edge too: the recipient of a withdrawal must itself be eligible to
@@ -189,7 +220,7 @@ contract SaksiPoolTest is Test {
         uint[11] memory p = _pub(holder, bytes32(uint256(16)));
         vm.prank(holder);
         vm.expectRevert();
-        pool.deposit(100e6, bytes32(uint256(16)), pA, pB, pC, p);
+        pool.deposit(100e6, bytes32(uint256(16)), pA, pB, pC, p, pA, pB, pC, _bind(bytes32(uint256(16)), 100e6));
     }
 
     function test_OwnerManagesThePerimeter() public {
@@ -212,7 +243,7 @@ contract SaksiPoolTest is Test {
         uint[11] memory p = _pub(holder, bytes32(uint256(3)));
         vm.prank(holder);
         vm.expectRevert(SaksiPool.CommitmentNotBound.selector);
-        pool.deposit(100e6, bytes32(uint256(4)), pA, pB, pC, p);
+        pool.deposit(100e6, bytes32(uint256(4)), pA, pB, pC, p, pA, pB, pC, _bind(bytes32(uint256(4)), 100e6));
     }
 
     function test_DenyListMustMatchChainState() public {
@@ -222,7 +253,7 @@ contract SaksiPoolTest is Test {
         uint[11] memory p = _pub(holder, bytes32(uint256(5))); // still carries the old empty list
         vm.prank(holder);
         vm.expectRevert(SaksiPool.DenyListMismatch.selector);
-        pool.deposit(100e6, bytes32(uint256(5)), pA, pB, pC, p);
+        pool.deposit(100e6, bytes32(uint256(5)), pA, pB, pC, p, pA, pB, pC, _bind(bytes32(uint256(5)), 100e6));
     }
 
     function test_RetiredRootFreezesHolder() public {
@@ -231,7 +262,7 @@ contract SaksiPoolTest is Test {
         uint[11] memory p = _pub(holder, bytes32(uint256(6)));
         vm.prank(holder);
         vm.expectRevert(SaksiPool.UnknownRoot.selector);
-        pool.deposit(100e6, bytes32(uint256(6)), pA, pB, pC, p);
+        pool.deposit(100e6, bytes32(uint256(6)), pA, pB, pC, p, pA, pB, pC, _bind(bytes32(uint256(6)), 100e6));
     }
 
     function test_RotatedRootKeepsOldOneUsable() public {
@@ -246,7 +277,7 @@ contract SaksiPoolTest is Test {
         uint[11] memory p = _pub(holder, bytes32(uint256(8)));
         vm.prank(holder);
         vm.expectRevert(SaksiPool.InvalidProof.selector);
-        pool.deposit(100e6, bytes32(uint256(8)), pA, pB, pC, p);
+        pool.deposit(100e6, bytes32(uint256(8)), pA, pB, pC, p, pA, pB, pC, _bind(bytes32(uint256(8)), 100e6));
     }
 
     function test_DuplicateCommitmentRejected() public {
@@ -254,7 +285,7 @@ contract SaksiPoolTest is Test {
         uint[11] memory p = _pub(holder, bytes32(uint256(9)));
         vm.prank(holder);
         vm.expectRevert(SaksiPool.CommitmentExists.selector);
-        pool.deposit(10e6, bytes32(uint256(9)), pA, pB, pC, p);
+        pool.deposit(10e6, bytes32(uint256(9)), pA, pB, pC, p, pA, pB, pC, _bind(bytes32(uint256(9)), 10e6));
     }
 
     function test_PauseBlocksEntry() public {
@@ -262,7 +293,7 @@ contract SaksiPoolTest is Test {
         uint[11] memory p = _pub(holder, bytes32(uint256(11)));
         vm.prank(holder);
         vm.expectRevert(SaksiPool.Paused.selector);
-        pool.deposit(10e6, bytes32(uint256(11)), pA, pB, pC, p);
+        pool.deposit(10e6, bytes32(uint256(11)), pA, pB, pC, p, pA, pB, pC, _bind(bytes32(uint256(11)), 10e6));
     }
 
     // ---- the shielded middle ----------------------------------------------

@@ -190,6 +190,8 @@ contract SaksiPool is Ownable {
     error DepositsUseDepositPath();
     error NotBoolean();
     error ValidatorRefused(address who);
+    error AmountNotBound();
+    error DuplicateOutput();
 
     constructor(
         address _asset,
@@ -320,15 +322,28 @@ contract SaksiPool is Ownable {
 
     /// Deposit CVA into the confidential register.
     ///
-    /// pubSignals is [aspRoot, denyList[0..7], sourceKey, bindHash]. Every one of
-    /// those is checked against chain state rather than trusted from the caller: the
-    /// root must be accepted, the deny list must match ours, the source key must be
-    /// this caller's, and bindHash must be the commitment being inserted.
+    /// TWO proofs, because one is not enough and the compliance circuit says so in its
+    /// own header: it binds the caller and the commitment, but nothing in it binds the
+    /// commitment to a VALUE. A commitment is Poseidon(amount, pubKey, blinding) computed
+    /// off-chain, so without a second proof a depositor could transfer one unit while
+    /// committing to a million, and the JoinSplit would faithfully conserve the forgery
+    /// on the way out.
+    ///
+    ///   compliance  [aspRoot, denyList[0..7], sourceKey, bindHash]
+    ///               — who may enter, bound to this caller and this commitment
+    ///   binding     [commitment, disclosedAmount, contextHash]
+    ///               — the commitment opens to EXACTLY the amount being transferred
+    ///
+    /// Every public signal is checked against chain state rather than trusted from the
+    /// caller: the root must be accepted, the deny list must match ours, the source key
+    /// must be this caller's, and both proofs must name the same commitment.
     function deposit(
         uint256 amount,
         bytes32 commitment,
         uint[2] calldata pA, uint[2][2] calldata pB, uint[2] calldata pC,
-        uint[11] calldata pubSignals
+        uint[11] calldata pubSignals,
+        uint[2] calldata bA, uint[2][2] calldata bB, uint[2] calldata bC,
+        uint[3] calldata bindSignals
     ) external notPaused {
         if (amount == 0) revert ZeroAmount();
         if (commitmentKnown[commitment]) revert CommitmentExists();
@@ -350,6 +365,14 @@ contract SaksiPool is Ownable {
         if (pubSignals[10] != uint256(commitment) % FIELD) revert CommitmentNotBound();
 
         if (!complianceVerifier.verifyProof(pA, pB, pC, pubSignals)) revert InvalidProof();
+
+        // THE VALUE BINDING. Eligibility says this wallet may enter; it says nothing about
+        // what it is entering WITH. Without the three lines below, a depositor transfers
+        // one unit, commits to a million, and the JoinSplit conserves the forgery out the
+        // other side. The commitment must open to exactly the amount that moved.
+        if (bindSignals[0] != uint256(commitment) % FIELD) revert CommitmentNotBound();
+        if (bindSignals[1] != amount) revert AmountNotBound();
+        if (!exactVerifier.verifyProof(bA, bB, bC, bindSignals)) revert InvalidProof();
 
         uint256 leafIndex = commitments.length;
         commitmentKnown[commitment] = true;
@@ -396,6 +419,9 @@ contract SaksiPool is Ownable {
         bytes32 cA = bytes32(pubSignals[5]);
         bytes32 cB = bytes32(pubSignals[6]);
         if (commitmentKnown[cA] || commitmentKnown[cB]) revert CommitmentExists();
+        // Two identical outputs would insert the same leaf twice and leave the note tree
+        // disagreeing with the commitment array.
+        if (cA == cB) revert DuplicateOutput();
 
         if (!transferVerifier.verifyProof(pA, pB, pC, pubSignals)) revert InvalidProof();
 

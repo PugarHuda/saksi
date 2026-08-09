@@ -78,23 +78,50 @@ console.log(`commitment   0x${commitment.toString(16).padStart(64, "0")}`);
 
 // ---- 3. prove --------------------------------------------------------------
 
-const wasm = path.join(ROOT, "circuits/build/compliance_js/compliance.wasm");
-const zkey = path.join(ROOT, "circuits/build/compliance_final.zkey");
-const vkey = JSON.parse(fs.readFileSync(path.join(ROOT, "circuits/build/compliance_vk.json"), "utf8"));
+const art = (name) => ({
+  wasm: path.join(ROOT, `circuits/build/${name}_js/${name}.wasm`),
+  zkey: path.join(ROOT, `circuits/build/${name}_final.zkey`),
+  vkey: JSON.parse(fs.readFileSync(path.join(ROOT, `circuits/build/${name}_vk.json`), "utf8")),
+});
+
+async function prove(name, inputs, label) {
+  const { wasm, zkey, vkey } = art(name);
+  const t0 = Date.now();
+  const { proof, publicSignals } = await snarkjs.groth16.fullProve(inputs, wasm, zkey);
+  if (!(await snarkjs.groth16.verify(vkey, publicSignals, proof))) {
+    throw new Error(`${name}: proof does not verify locally — do not send it`);
+  }
+  console.log(`  ${label.padEnd(18)} proved and verified in ${Date.now() - t0} ms`);
+  // The JS API takes (proof, publicSignals); the CLI takes them the other way round.
+  const calldata = await snarkjs.groth16.exportSolidityCallData(proof, publicSignals);
+  return JSON.parse("[" + calldata + "]");
+}
 
 console.log("\nproving…");
-const started = Date.now();
-const { proof, publicSignals } = await snarkjs.groth16.fullProve(input, wasm, zkey);
-console.log(`proved in ${Date.now() - started} ms`);
 
-if (!(await snarkjs.groth16.verify(vkey, publicSignals, proof))) {
-  throw new Error("proof does not verify locally — do not send it");
-}
-console.log("verifies locally against the verification key");
+// Proof one: who may enter. Binds this caller and this commitment, but says nothing
+// about value — the compliance circuit's own header is explicit that a separate proof
+// must tie the commitment to an amount.
+const [pA, pB, pC, pub] = await prove("compliance", input, "compliance");
 
-// The JS API takes (proof, publicSignals); the CLI takes them the other way round.
-const calldata = await snarkjs.groth16.exportSolidityCallData(proof, publicSignals);
-const [pA, pB, pC, pub] = JSON.parse("[" + calldata + "]");
+// Proof two: what is entering. Opens the commitment and shows it contains exactly the
+// amount being transferred. Without it a depositor could move one unit and commit to a
+// million, and the JoinSplit would carry the forgery out the other side.
+const [bA, bB, bC, bind] = await prove(
+  "disclosure",
+  {
+    commitment: commitment.toString(),
+    disclosedAmount: amount.toString(),
+    auditContextHash: "0",      // entry binding answers no auditor's question
+    amount: amount.toString(),
+    pubKey: pubKey.toString(),
+    blinding: blinding.toString(),
+  },
+  "value binding",
+);
+
+if (BigInt(bind[0]) !== commitment) throw new Error("binding proof names a different commitment");
+if (BigInt(bind[1]) !== amount) throw new Error("binding proof names a different amount");
 
 const commitmentHex = "0x" + commitment.toString(16).padStart(64, "0");
 if (BigInt(pub[10]) !== commitment) throw new Error("bindHash is not the commitment");
@@ -111,6 +138,7 @@ const artifact = {
   aspRoot: asp.root,
   leafIndex,
   proof: { pA, pB, pC, pub },
+  binding: { bA, bB, bC, bind },
   provedAt: new Date().toISOString(),
 };
 fs.writeFileSync(path.join(ROOT, ".artifacts", "last-deposit.json"), JSON.stringify(artifact, null, 2));
@@ -129,8 +157,10 @@ console.log(cast(["send", dep.asset, "approve(address,uint256)", dep.pool, amoun
 
 console.log("\ndepositing…");
 const out = cast(["send", dep.pool,
-  "deposit(uint256,bytes32,uint256[2],uint256[2][2],uint256[2],uint256[11])",
-  amount.toString(), commitmentHex, fmt(pA), fmt2(pB), fmt(pC), fmt(pub),
+  "deposit(uint256,bytes32,uint256[2],uint256[2][2],uint256[2],uint256[11],uint256[2],uint256[2][2],uint256[2],uint256[3])",
+  amount.toString(), commitmentHex,
+  fmt(pA), fmt2(pB), fmt(pC), fmt(pub),
+  fmt(bA), fmt2(bB), fmt(bC), fmt(bind),
   "--rpc-url", RPC, "--chain", "10143", "--private-key", pk]);
 const lines = out.split("\n").filter((l) => /^(status|transactionHash|gasUsed|blockNumber)/.test(l));
 console.log(lines.join("\n"));
