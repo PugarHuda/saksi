@@ -15,7 +15,8 @@ npm test                      # parses every ops script, then runs the Foundry s
 node ops/evidence.mjs         # rebuild the evidence table from the chain
 node ops/evidence.mjs --md    # same, markdown, for SUMMARY.md
 cd web && npm run dev         # console at localhost:3000
-cd web && npx playwright test # 10 e2e tests against the console
+cd web && npx playwright test # e2e against the console; BASE_URL=https://saksi-gilt.vercel.app
+                              # runs the same suite against production, which is the one that counts
 ```
 
 `ops/evidence.mjs`, `ops/gas.mjs`, and `ops/cva-gate.mjs` are read-only and safe
