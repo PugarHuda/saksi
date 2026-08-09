@@ -14,18 +14,36 @@ Built on Cleanverse CVI and CVA · deployed on Monad testnet.
 
 ---
 
-## The problem
+## The problem, measured
 
-Every tokenized RWA platform publishes its holder register in the clear. An institution
-that buys a tokenized note broadcasts its position size, its entry timing, and its
-counterparty to every competitor watching the chain. That is a principal reason
-institutional private credit stays on permissioned ledgers or never issues at all.
+Every tokenized RWA platform publishes its holder register in the clear. The usual reply
+is that a public chain is pseudonymous, so this costs nothing. We checked.
+
+```
+$ node ops/measure-register.mjs
+545 credentialed wallets × every CVA on Monad — an exhaustive census, not a sample
+
+median holders per asset                       2
+held by exactly one wallet                     2
+fewer than five holders                        6 of 9   (67%)
+one wallet holding 90%+ of the counted supply  3
+```
+
+An anonymity set of two is not anonymity. Knowing the asset and watching one transfer
+identifies the position and its size.
+
+This is not an artefact of a quiet testnet — it is the mechanism. **The tighter an
+asset's holder rule, the smaller the crowd its holders hide in.** Eligibility restricts
+the population by design, so compliance and confidentiality pull against each other
+structurally. Every compliant-asset design tightens the rule; tightening it makes each
+remaining holder more exposed, not less.
 
 The obvious fix — a privacy pool — destroys the thing that made the asset legitimate.
 The issuer can no longer prove who holds what, cannot enforce a concentration cap, and
 cannot find a holder whose credential was revoked.
 
-Saksi refuses that trade. **Private in the middle, accountable at both edges.**
+Saksi refuses the trade-off rather than picking a side of it.
+**Private in the middle, accountable at both edges.**
 
 ## How it works
 

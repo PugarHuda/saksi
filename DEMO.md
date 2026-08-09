@@ -8,17 +8,37 @@ https://saksi-gilt.vercel.app. Have `https://testnet.monadexplorer.com` in a thi
 
 ---
 
-## Cold open — 25 seconds, no product yet
+## Cold open — 40 seconds, terminal only, no product yet
 
-> "Every tokenized asset platform publishes its holder register in the clear. If you buy a
-> tokenized note, your position size and your entry timing are visible to every competitor
-> watching the chain. That is why institutions keep this business on private ledgers."
+Start in the terminal. Do not show the product until the problem is a number.
 
-Show the **Register** tab. Point at the Amount and Holder columns — six dots each.
+```bash
+node ops/measure-register.mjs
+```
 
-> "This is the same register, on a public chain. Seven positions, five verified holders,
-> two and a quarter thousand notes under management. The total is public. Who holds what
-> is not."
+While it runs:
+
+> "Every tokenized asset platform publishes its holder register in the clear, and the
+> usual answer is that a public chain is pseudonymous so it costs nothing. I checked."
+
+> "A verified asset can only move between wallets that hold a credential, so the
+> credentialed set isn't a sample of possible holders — it's all of them. This reads every
+> balance, for every one of them, against every verified asset on Monad."
+
+Let the table land. Point at the median.
+
+> "Median holders per asset: two. Six of the nine have fewer than five. Three have one
+> wallet holding over ninety percent. An anonymity set of two is not anonymity — knowing
+> the asset and watching one transfer identifies the position and its size."
+
+> "And this isn't a quiet testnet. It's the mechanism. The tighter you make an asset's
+> holder rule, the smaller the crowd its holders hide in. Every project in this hackathon
+> tightens that rule. Tightening it makes each remaining holder more exposed, not less."
+
+Now switch to the **Register** tab. Point at the Amount and Holder columns — six dots each.
+
+> "Same asset class, same public chain. Seven positions, five verified holders. The total
+> is public. Who holds what is not."
 
 ---
 

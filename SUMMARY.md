@@ -15,16 +15,38 @@ A-Pass registry rather than a lookup performed before the transaction.**
 
 Anyone can check that ordering with an RPC endpoint and no access to this repository.
 
-## Problem
+## Problem — measured, not asserted
 
-Every tokenized RWA platform publishes its holder register in the clear. An institution
-buying a tokenized note broadcasts its position size, entry timing and counterparty to
-every competitor watching the chain. That is a principal reason institutional private
-credit stays on permissioned ledgers or never issues.
+Every tokenized RWA platform publishes its holder register in the clear. The usual reply
+is that a public chain is pseudonymous, so this costs the holder nothing. We measured
+whether that is true for this asset class. `node ops/measure-register.mjs` runs an
+exhaustive census: a CVA transfer requires a credential on both sides, so the set of
+wallets holding an A-Pass is not a sample of possible holders — it is all of them.
+
+**545 credentialed wallets × every CVA on Monad, every balance read, no failed reads:**
+
+| | |
+|---|---|
+| Assets with at least one holder | 9 |
+| **Median holders per asset** | **2** |
+| Held by exactly one wallet | 2 |
+| Fewer than five holders | 6 of 9 — **67%** |
+| One wallet holding 90%+ of supply | 3 |
+
+An anonymity set of two is not anonymity. Knowing the asset and watching one transfer
+identifies the position and its size.
+
+And this is not a testnet artefact — it is the mechanism. **The tighter an asset's holder
+rule, the smaller the crowd its holders hide in.** Eligibility restricts the population by
+design, so compliance and confidentiality are structurally in tension. Every project here
+tightens the rule. None of them notice that doing so makes each remaining holder more
+exposed, not less.
 
 The obvious fix — a privacy pool — destroys what made the asset legitimate: the issuer can
 no longer prove who holds what, enforce a concentration cap, or act on a revoked
 credential.
+
+Saksi refuses the trade-off rather than picking a side of it.
 
 ## Solution
 
@@ -105,6 +127,12 @@ recomputes it — so the holder cannot answer by leaving a position out, and can
 falsely. **There is no proof, so the request is still open on-chain.** Every other system
 here answers or reverts; this one records that it could not answer.
 
+The distinction worth naming: **a log is a claim, a proof is a check.** A compliance
+system that writes its decisions to a ledger asks you to trust the thing doing the
+writing — drop a row and nobody knows. Saksi asks for no trust at all. When the total was
+1,150 and the cap was 1,000, no private key, no honest operator and no privileged party
+could have produced that answer, because the witness does not exist.
+
 ## What is running
 
 | | |
@@ -117,6 +145,18 @@ here answers or reverts; this one records that it could not answer.
 | Tests | 34 Foundry tests, incl. a real proof against the exported verifier at 264k gas |
 
 Regenerate this table from the chain yourself: `node ops/evidence.mjs`.
+
+## The obvious question
+
+*"If I hold the note outside your pool, my position is public again — so what is
+confidential, the asset or the pool?"*
+
+The pool. Confidentiality is opt-in, and that is the correct shape rather than a
+limitation: it is how a nominee account works in traditional markets. A holder who wants
+to be visible stays on the token's own balance map; a holder who does not enters the
+register and becomes one commitment among many. What Saksi adds is that entering the
+nominee does not cost the issuer or the regulator anything — the position stays
+answerable, which is precisely what a real nominee account cannot promise.
 
 ## Scalability
 

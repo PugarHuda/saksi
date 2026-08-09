@@ -11,12 +11,13 @@ const root = path.resolve(web, "..");
 const out = path.join(web, "public", "data");
 fs.mkdirSync(out, { recursive: true });
 
-const files = ["deployment.json", "asp.json", "audit-log.json", "notes.json"];
+const files = ["deployment.json", "asp.json", "audit-log.json", "notes.json", "measurement.json"];
 for (const f of files) {
   const src = path.join(root, f);
   if (!fs.existsSync(src)) {
     console.warn(`sync-data: ${f} missing, writing an empty placeholder`);
-    fs.writeFileSync(path.join(out, f), f === "deployment.json" ? "{}" : "[]");
+    const empty = f === "notes.json" || f === "audit-log.json" ? "[]" : "{}";
+    fs.writeFileSync(path.join(out, f), empty);
     continue;
   }
   let data = JSON.parse(fs.readFileSync(src, "utf8"));

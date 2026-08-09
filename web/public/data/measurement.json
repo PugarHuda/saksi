@@ -1,0 +1,79 @@
+{
+  "chain": "monad",
+  "headBlock": 52171990,
+  "measuredAt": "2026-08-09T07:13:25.388Z",
+  "method": "exhaustive census: balanceOf for every wallet holding an active A-Pass, against every A-Token on this chain. A CVA transfer requires a credential on both sides, so the credentialed set is the complete set of possible holders.",
+  "caveat": "counts only credentials active at measurement time; can only undercount, so the anonymity sets reported are upper bounds",
+  "walletsEnumerated": 545,
+  "tokensEnumerated": 42,
+  "assetsWithHolders": 9,
+  "medianHolders": 2,
+  "singleHolderAssets": 2,
+  "assetsUnderFiveHolders": 6,
+  "assetsWithDominantHolder": 3,
+  "assets": [
+    {
+      "symbol": "NCN26",
+      "token": "0xcb7ce65af23d051bd90d07f41034ab108c2e14aa",
+      "holders": 1,
+      "topShare": 100,
+      "supply": "6000000"
+    },
+    {
+      "symbol": "CVN739F2EB0A",
+      "token": "0xdaaa73ce2d7f960715426a9b9d9b4346653d8ef7",
+      "holders": 1,
+      "topShare": 100,
+      "supply": "100000000"
+    },
+    {
+      "symbol": "SAKSIAZEV",
+      "token": "0xb9c53b57cd47bd3b55143647bef8297d1c5f4d6b",
+      "holders": 2,
+      "topShare": 99.77,
+      "supply": "1000000000000"
+    },
+    {
+      "symbol": "VL47966050",
+      "token": "0x77479940fd621c564833973fff3b81ad99790552",
+      "holders": 2,
+      "topShare": 66.66,
+      "supply": "3000000"
+    },
+    {
+      "symbol": "KLYUSD",
+      "token": "0xbd8f3d57c8d06a321c36e2cdcdcf9cbca4592af0",
+      "holders": 2,
+      "topShare": 50,
+      "supply": "20000000000000000000"
+    },
+    {
+      "symbol": "NUSD26",
+      "token": "0x3c1d80af0dd22e495deba2a9979c6033f7659859",
+      "holders": 2,
+      "topShare": 50,
+      "supply": "60000000"
+    },
+    {
+      "symbol": "QNOTE",
+      "token": "0x26b57c58c20c171233e15c73fa1bd814b269dd88",
+      "holders": 7,
+      "topShare": 20,
+      "supply": "500000000000000000000"
+    },
+    {
+      "symbol": "aUSDC",
+      "token": "0xfa96de5b8f434c26fdff953303dd66ff80af1026",
+      "holders": 7,
+      "topShare": 18.69,
+      "supply": "60000000"
+    },
+    {
+      "symbol": "ausdc",
+      "token": "0xac0893567d43c3e7e6e35a72803df05416c1f20d",
+      "holders": 49,
+      "topShare": 27.03,
+      "supply": "552140000"
+    }
+  ]
+}

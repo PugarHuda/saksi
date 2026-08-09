@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type { Asp, AuditEntry, Deployment, Position } from "@/lib/types";
+import type { Asp, AuditEntry, Deployment, Measurement, Position } from "@/lib/types";
 import { useLive } from "@/lib/useLive";
 import RegisterView from "./RegisterView";
 import IssuerView from "./IssuerView";
@@ -23,11 +23,13 @@ export default function Console({
   asp,
   audit,
   positions,
+  measurement,
 }: {
   deployment: Deployment;
   asp: Asp | null;
   audit: AuditEntry[];
   positions: Position[];
+  measurement: Measurement | null;
 }) {
   const [tab, setTab] = useState<TabId>("register");
   const live = useLive(deployment);
@@ -81,7 +83,12 @@ export default function Console({
 
       <main role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
         {tab === "register" && (
-          <RegisterView deployment={deployment} live={live} positions={positions} />
+          <RegisterView
+            deployment={deployment}
+            live={live}
+            positions={positions}
+            measurement={measurement}
+          />
         )}
         {tab === "gates" && <GatesView deployment={deployment} asp={asp} />}
         {tab === "issuer" && <IssuerView deployment={deployment} live={live} asp={asp} />}

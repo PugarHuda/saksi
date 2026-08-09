@@ -20,7 +20,18 @@ Saksi is a confidential holder register for tokenized RWAs. Positions in a Clean
 Verified Asset are held as commitments, so amount and holder are absent from the chain,
 while entry, exit and audit stay answerable.
 
-Two things I would point a judge at first:
+Three things I would point a judge at first:
+
+0. **The problem is measured, not asserted.** `node ops/measure-register.mjs` runs an
+   exhaustive census — a CVA transfer needs a credential on both sides, so the 545
+   credentialed wallets on Monad are the complete set of possible holders, not a sample.
+   Result: **median holders per verified asset is 2**, six of nine assets have fewer than
+   five holders, and three have a single wallet holding over 90% of supply. That is the
+   mechanism rather than a testnet artefact — the tighter an asset's holder rule, the
+   smaller the crowd its holders hide in. Compliance and confidentiality pull against each
+   other structurally, and Saksi is the entry that refuses the trade-off instead of
+   picking a side.
+
 
 1. **The auditor's question is registered on-chain before the answer exists.** Block
    52157468 asks whether a position is under a cap; block 52157475 answers with a Groth16

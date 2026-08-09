@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import Console from "@/components/Console";
-import type { Asp, AuditEntry, Deployment, Position } from "@/lib/types";
+import type { Asp, AuditEntry, Deployment, Measurement, Position } from "@/lib/types";
 
 // The snapshot the ops scripts produced. Everything live — roots, rules, eligibility,
 // balances — is read from Monad in the browser, so this only carries what the chain
@@ -20,8 +20,15 @@ export default function Page() {
   const asp = read<Asp | null>("asp.json", null);
   const audit = read<AuditEntry[]>("audit-log.json", []);
   const positions = read<Position[]>("notes.json", []);
+  const measurement = read<Measurement | null>("measurement.json", null);
 
   return (
-    <Console deployment={deployment} asp={asp} audit={audit} positions={positions} />
+    <Console
+      deployment={deployment}
+      asp={asp}
+      audit={audit}
+      positions={positions}
+      measurement={measurement}
+    />
   );
 }

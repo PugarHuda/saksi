@@ -57,6 +57,20 @@ export type AuditEntry = {
   at: string;
 };
 
+export type Measurement = {
+  chain: string;
+  measuredAt: string;
+  method: string;
+  caveat: string;
+  walletsEnumerated: number;
+  assetsWithHolders: number;
+  medianHolders: number;
+  singleHolderAssets: number;
+  assetsUnderFiveHolders: number;
+  assetsWithDominantHolder: number;
+  assets: { symbol: string; token: string; holders: number; topShare: number }[];
+};
+
 export type Position = {
   commitment: string;
   wallet: string;

@@ -1,7 +1,7 @@
 "use client";
 
 import { short, units } from "@/lib/chain";
-import type { Deployment, Position } from "@/lib/types";
+import type { Deployment, Measurement, Position } from "@/lib/types";
 import type { useLive } from "@/lib/useLive";
 import { Addr, Badge, Empty, ErrorBox, Redacted, Skeleton, Tx } from "./bits";
 
@@ -9,15 +9,18 @@ export default function RegisterView({
   deployment,
   live,
   positions,
+  measurement,
 }: {
   deployment: Deployment;
   live: ReturnType<typeof useLive>;
   positions: Position[];
+  measurement: Measurement | null;
 }) {
   const d = live.data;
 
   return (
     <div className="grid">
+      {measurement && <WhyThisMatters m={measurement} />}
       <section className="grid three">
         <div className="card">
           <h2>Positions held</h2>
@@ -173,5 +176,58 @@ export default function RegisterView({
         </p>
       </section>
     </div>
+  );
+}
+
+/** The problem, as a measurement rather than an assertion. A verified asset only moves
+ *  between credentialed wallets, so the credentialed set is the complete set of possible
+ *  holders — this census is exhaustive over it, not a sample of it. */
+function WhyThisMatters({ m }: { m: Measurement }) {
+  const pct = m.assetsWithHolders
+    ? Math.round((m.assetsUnderFiveHolders / m.assetsWithHolders) * 100)
+    : 0;
+
+  return (
+    <section className="card">
+      <h2>Why a register needs to be confidential</h2>
+      <p className="note">
+        A census, not a sample: every balance of every verified asset on {m.chain}, read
+        against all {m.walletsEnumerated} credentialed wallets — the complete set of parties
+        a verified asset is permitted to move to.
+      </p>
+
+      <div className="grid three" style={{ marginBottom: 12 }}>
+        <div className="card" style={{ background: "var(--surface-2)" }}>
+          <h3>Median holders per asset</h3>
+          <p className="stat accent mono">{m.medianHolders}</p>
+        </div>
+        <div className="card" style={{ background: "var(--surface-2)" }}>
+          <h3>Fewer than five holders</h3>
+          <p className="stat mono">
+            {m.assetsUnderFiveHolders}
+            <span style={{ fontSize: 15, color: "var(--muted)" }}> / {m.assetsWithHolders}</span>
+          </p>
+          <p className="note" style={{ margin: "6px 0 0" }}>{pct}% of assets measured</p>
+        </div>
+        <div className="card" style={{ background: "var(--surface-2)" }}>
+          <h3>One wallet over 90% of supply</h3>
+          <p className="stat mono">{m.assetsWithDominantHolder}</p>
+        </div>
+      </div>
+
+      <p className="callout">
+        An anonymity set of {m.medianHolders} is not anonymity. Knowing the asset and watching
+        one transfer identifies the position and its size. This is not a quiet-testnet
+        artefact — it is the mechanism: <strong>the tighter an asset&apos;s holder rule, the
+        smaller the crowd its holders hide in.</strong> Eligibility restricts the population by
+        design, so compliance and confidentiality pull against each other structurally.
+      </p>
+
+      <p className="note" style={{ margin: "12px 0 0" }}>
+        Measured {m.measuredAt.replace("T", " ").slice(0, 16)} UTC. {m.caveat} — the error can
+        only run one way, so these are upper bounds on privacy. Reproduce with{" "}
+        <code className="mono">node ops/measure-register.mjs</code>.
+      </p>
+    </section>
   );
 }
