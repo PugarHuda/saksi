@@ -18,9 +18,13 @@ tape or corrupts an artefact.
 | command | why it is recorded |
 |---|---|
 | `node ops/measure-register.mjs` | ~4 minutes, and it **overwrites `measurement.json`** while it runs. Record it once; the artefact it wrote is in the repo and is what the summary quotes. |
-| `node ops/gate-gap.mjs` | asks Cleanverse's validator about all 524 members one call at a time — **~4.5 minutes**. Record the sweep. Its header table prints instantly and *is* shot live. |
+| `node ops/gate-gap.mjs` | asks Cleanverse's validator about all 524 members one call at a time. Timed at **4.5 minutes**
+once and at **~15 minutes** on a clean clone — it spawns one `cast` process per member and the
+public endpoint caps at about 15 requests a second, so budget the long figure. Record the sweep. Its header table prints instantly and *is* shot live. |
 
-Everything else finishes inside a beat, measured: `evidence.mjs` 14 s, `gas.mjs` 5 s,
+Everything else finishes inside a beat. Measured across two runs today: `evidence.mjs`
+7-11 s, `gas.mjs` 3-8 s — the spread is the public RPC, not the scripts, so leave room rather
+than cutting to the second,
 `forge test` under a second, `cast call` instant.
 
 Say the word "recording" out loud when you play one. The whole submission rests on being
@@ -65,6 +69,12 @@ cast call $POOL "allCommitments()(uint256[])" --rpc-url $RPC | tr ',' '\n' | wc 
 > it is still being deposited into, so check it live rather than against my slide."
 
 Show `0x78168fda9282e1d7933c942c102ab2d53b4049a98cda272b0eb7f23167f1291c`, block 52244580.
+
+> **This command needs the operator's ledgers.** `notes.json` and `notes.holder2.json` hold the
+> openings — including a blinding that exists nowhere else — so they are gitignored and a clone
+> does not have them. From a clone this throws `MODULE_NOT_FOUND`. Record it on the machine that
+> ran the transfer, or show the commitments from `notes.public.json` instead and say the private
+> half is not in the repo.
 
 ```bash
 node -e "const s=require('./notes.json'),h=require('./notes.holder2.json');console.log('sending ledger:',s.length,'positions',s.map(n=>n.commitment.slice(0,14)).join(' '));console.log('paid out:     ',h.notes[0].commitment.slice(0,14),'— not in that list, and its private key is not there either')"
