@@ -8,7 +8,12 @@
 A confidential holder register for tokenized real-world assets.
 Built on Cleanverse CVI and CVA · deployed on Monad testnet.
 
-[Live console](https://saksi-gilt.vercel.app) · [Pool on explorer](https://testnet.monadexplorer.com/address/0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA) · [Summary](SUMMARY.md)
+[Live console](https://saksi-gilt.vercel.app) · [One page](ONEPAGE.md) · [Deck](https://saksi-gilt.vercel.app/deck) · [Pool on explorer](https://testnet.monadexplorer.com/address/0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA)
+
+<sub>The pool's source is <strong>not verified</strong> on the explorer, and cannot honestly be
+verified from this tree: <code>SaksiPool.sol</code> has changed three times since the deploy and
+every one of those changes is listed as undeployed. Read the register instead — every claim on
+this page is a <code>cast call</code> you can run yourself, and they are printed below.</sub>
 
 </div>
 
