@@ -28,7 +28,8 @@ export default function RegisterView({
             {live.status === "loading" ? <Skeleton w="3em" /> : d ? String(d.positions) : "—"}
           </p>
           <p className="note" style={{ margin: "8px 0 0" }}>
-            Commitments in the register. Who holds them, and for how much, is not on chain.
+            Commitments in the register. What a commitment hides is not the entry — it is the
+            link between a position and wherever it goes next.
           </p>
         </div>
 
@@ -119,9 +120,11 @@ export default function RegisterView({
       <section className="card">
         <h2>The register</h2>
         <p className="note">
-          Every row is a position this contract is holding. The amount column is the point of
-          the product: the register knows it, the chain stores a commitment to it, and no
-          observer can read it.
+          Every row is a position this contract is holding. Entry is public by construction —
+          the deposit transaction in the last column carries a visible sender and a visible
+          ERC-20 amount, so today these figures are reconstructible from the chain. The
+          commitment is what makes them unreadable <em>after</em> a position moves: a JoinSplit
+          spends notes and creates new ones that cannot be linked back to this row.
         </p>
 
         {positions.length === 0 ? (

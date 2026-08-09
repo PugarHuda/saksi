@@ -3,7 +3,7 @@
 
 # Saksi
 
-**Every position witnessed, nothing revealed.**
+**Every position witnessed. Disclosure only when asked.**
 
 A confidential holder register for tokenized real-world assets.
 Built on Cleanverse CVI and CVA · deployed on Monad testnet.

@@ -156,7 +156,21 @@ cd contracts && forge test
 > circuit over Cleanverse's live identity registry, not a lookup performed beforehand and
 > trusted afterwards."
 
-> "Saksi. Every position witnessed, nothing revealed."
+> "Saksi. Every position witnessed. Disclosure only when asked."
+
+## Say this before a judge finds it
+
+Do not let anyone discover this in your devtools. Say it in beat one, in your own words:
+
+> "Entry here is public and I am not going to pretend otherwise — a deposit has a visible
+> sender and moves a visible amount, so the chain already links this commitment to the
+> wallet that opened it. What the commitment buys is the next hop: once a position moves
+> through a JoinSplit, nothing links the new note to this row. That is the layer I'm asking
+> you to judge, and I'll show it running."
+
+Volunteering the boundary is worth more than the boundary being wider. A reviewer who finds
+an overclaim discounts everything else you said; one who hears you name your own limit
+believes the rest.
 
 ---
 

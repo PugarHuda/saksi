@@ -32,7 +32,15 @@ export default function GatesView({
   ];
 
   const load = useCallback(async () => {
-    if (!deployment.validator || !deployment.pool || !asp) return;
+    // Without these the skeletons would shimmer forever with no error and no empty state —
+    // and this is the tab carrying the argument, so a silent hang is the worst outcome.
+    if (!deployment.validator || !deployment.pool || !asp) {
+      setError(
+        "No association set or validator recorded yet. Run `node ops/asp.mjs build` and register the pool.",
+      );
+      setRows([]);
+      return;
+    }
     setError(null);
     try {
       const inSet = (a: string) =>

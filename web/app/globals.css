@@ -7,26 +7,30 @@
   --border: #dce0e8;
   --foreground: #0b0f1a;
   --muted: #5b6478;
-  --accent: #b8860b;
-  --accent-soft: rgba(184, 134, 11, 0.12);
-  --verified: #0f7b4f;
-  --verified-soft: rgba(15, 123, 79, 0.12);
+  /* Darker than the mark's gold: #b8860b measures 3.25:1 on this surface and every
+     explorer link is 12.5px, so it failed AA where it mattered most. This reads as the
+     same gold and clears 4.5:1. */
+  --accent: #8a6508;
+  --accent-soft: rgba(138, 101, 8, 0.13);
+  --verified: #0d6b45;
+  --verified-soft: rgba(13, 107, 69, 0.13);
   --refused: #b4232b;
   --refused-soft: rgba(180, 35, 43, 0.1);
   --shielded: #6b4fbb;
   --shielded-soft: rgba(107, 79, 187, 0.12);
-  --ring: #b8860b;
+  --ring: #8a6508;
 
   --r: 8px;
   --sp: 4px;
-}
 
-:root:not([data-theme="light"]) {
-  color-scheme: dark;
+  /* Light palette on :root, so the UA hint must say light here. Declaring dark outside
+     the media query painted a white page with dark scrollbars and a dark caret. */
+  color-scheme: light;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
+    color-scheme: dark;
     --background: #0b0f1a;
     --surface: #121826;
     --surface-2: #1a2233;

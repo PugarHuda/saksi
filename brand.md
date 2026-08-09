@@ -7,7 +7,13 @@ called the witness; in law a witness is someone who can testify to a fact withou
 disclosing everything they know. Both meanings land on the product, which is why the name
 carries the whole idea.
 
-Tagline: **Every position witnessed, nothing revealed.**
+Tagline: **Every position witnessed. Disclosure only when asked.**
+
+The earlier line was "nothing revealed", and it was retired because it is not true of an
+entry: a deposit transaction has a visible sender and moves a visible amount, so the chain
+already discloses that. The product's real claim is narrower and stronger — nothing is
+disclosed unless somebody asks on-chain first, and the answer is a proof rather than a
+promise. Copy anywhere in this product must survive a reader with a block explorer open.
 
 ## Palette
 

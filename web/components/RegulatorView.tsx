@@ -155,8 +155,8 @@ export default function RegulatorView({
         <h2>Export</h2>
         <p className="note">
           The audit pack is the deliverable: every question, the proof that answered it, and the
-          transaction a regulator can check it against, without the register ever handing over a
-          holder list.
+          transaction a regulator can check it against. It contains questions and proofs — no
+          keys, and no note openings.
         </p>
         <a
           className="btn"

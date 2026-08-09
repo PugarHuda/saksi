@@ -36,13 +36,18 @@ export function Addr({ value }: { value: string }) {
   );
 }
 
-/** A figure the register is holding but deliberately not showing. Not a zero, not a dash
- *  — those mean "nothing here", and something is very much here. */
+/** A figure the register is holding but not showing here. Not a zero, not a dash — those
+ *  mean "nothing here", and something is very much here.
+ *
+ *  Deliberately does NOT claim the figure is unreadable: for an entry it is reconstructible
+ *  from the deposit transaction, and a tooltip that says otherwise is refutable in one
+ *  click. The claim the product actually earns is about what happens after a position moves.
+ */
 export function Redacted({ width = 6 }: { width?: number }) {
   return (
-    <span className="redacted mono" title="shielded — the register holds this figure and does not publish it">
+    <span className="redacted mono" title="held by the register; not shown here">
       {"•".repeat(width)}
-      <span className="sr-only">shielded</span>
+      <span className="sr-only">not shown</span>
     </span>
   );
 }

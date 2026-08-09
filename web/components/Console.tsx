@@ -41,7 +41,7 @@ export default function Console({
           <SaksiMark />
           <div>
             <h1>Saksi</h1>
-            <div className="tag">Every position witnessed, nothing revealed.</div>
+            <div className="tag">Every position witnessed. Disclosure only when asked.</div>
           </div>
         </div>
 
@@ -65,7 +65,7 @@ export default function Console({
       </header>
 
       <nav className="tabs" role="tablist" aria-label="Consoles">
-        {TABS.map((t) => (
+        {TABS.map((t, i) => (
           <button
             key={t.id}
             type="button"
@@ -73,8 +73,18 @@ export default function Console({
             id={`tab-${t.id}`}
             aria-selected={tab === t.id}
             aria-controls={`panel-${t.id}`}
+            // Roving tabindex: the tablist is one Tab stop, arrows move within it.
+            tabIndex={tab === t.id ? 0 : -1}
             className="tab"
             onClick={() => setTab(t.id)}
+            onKeyDown={(e) => {
+              const delta = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
+              if (!delta) return;
+              e.preventDefault();
+              const next = TABS[(i + delta + TABS.length) % TABS.length];
+              setTab(next.id);
+              document.getElementById(`tab-${next.id}`)?.focus();
+            }}
           >
             {t.label}
           </button>
