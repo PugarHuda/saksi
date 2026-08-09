@@ -140,6 +140,7 @@ Monad testnet, chain `10143`.
 | **SaksiPool** | [`0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA`](https://testnet.monadexplorer.com/address/0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA) |
 | **Saksi Series A Note** (our CVA, `SAKSIAZEV`) | [`0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B`](https://testnet.monadexplorer.com/address/0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B) |
 | Cleanverse CVI Compliance Validator | `0xaC7e5179C2C7f03f209136886c172eb34F161792` |
+| Auditor key — a different key from the issuer, which is what makes the audit record mean anything | `0x63CB403b716111c249d4D11312c15c5744CcC4e4` |
 | complianceVerifier | `0xd9911689e884598f563fffa6e3d2166963d731fd` |
 | transferVerifier | `0xa98cee28c6eb35b6ee7440b7490e265f23975d61` |
 | exactVerifier | `0x2960aece70bb3e80ed389147c79de1f6ff822563` |

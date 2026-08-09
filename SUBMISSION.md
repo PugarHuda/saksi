@@ -16,6 +16,13 @@ Submitting **Saksi** for the Trusted Assets build, RWA track.
 - **Live** — https://saksi-gilt.vercel.app · deck at https://saksi-gilt.vercel.app/deck
 - **Deployed chain** — Monad testnet, chain `10143`
 
+```
+SaksiPool                     0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA
+SAKSIAZEV, the CVA            0xb9c53B57Cd47Bd3b55143647BeF8297d1C5f4d6B
+CVI Compliance Validator      0xaC7e5179C2C7f03f209136886c172eb34F161792   (yours)
+Auditor key                   0x63CB403b716111c249d4D11312c15c5744CcC4e4   (a different key from the issuer)
+```
+
 **What it is.** A tokenized asset has to publish its holder register or it cannot be audited — and we measured what that costs rather than assuming it. An exhaustive census of every A-Pass wallet against all 104 A-Tokens on Monad: median holders per asset is **3**, and 16 assets have a single wallet above 90% of supply. Eligibility restricts the population by design, so the tighter the compliance rule, the smaller the crowd each holder hides in. A privacy pool fixes that by destroying what made the asset legitimate.
 
 Saksi holds positions as commitments that move by JoinSplit, so amounts and owners are never published — and stays answerable at both edges. Entry calls `complianceVerify` on your CVI Compliance Validator inside the same transaction that moves the value; the exit calls it twice more, on the recipient and the relayer. A regulator registers a question **on-chain before any answer exists**, and gets back a Groth16 proof bound to that exact question: exact, threshold, range, or aggregate.

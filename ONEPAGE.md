@@ -1,5 +1,7 @@
 # Saksi — a confidential holder register for tokenized real-world assets
 
+**Pool** `0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA` · **Auditor** `0x63CB403b716111c249d4D11312c15c5744CcC4e4`, a different key from the issuer — which is what makes the request-before-answer record worth anything.
+
 **Live** saksi-gilt.vercel.app · **Repo** github.com/PugarHuda/saksi · **Monad testnet, chain ID 10143** · Cleanverse CVI + CVA. Every figure below is printed by a command in this repo; the chain overrules any document.
 
 ## Problem — measured, not asserted
