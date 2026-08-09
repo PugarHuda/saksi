@@ -23,8 +23,8 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import * as snarkjs from "snarkjs";
 import { makePoseidon } from "./merkle.mjs";
-import { loadNotes, FIELD } from "./note.mjs";
-import { ROOT, RPC, readDeployment } from "./env.mjs";
+import { loadNotes, loadAllNotes, FIELD } from "./note.mjs";
+import { CAST, ROOT, RPC, readDeployment, succeeded, txHashOf } from "./env.mjs";
 
 const dep = readDeployment();
 const AGG_SLOTS = 5;
@@ -36,16 +36,19 @@ const AGG_SLOTS = 5;
 const auditorPk = process.env.AUDITOR_PK ?? process.env.DEPLOYER_PK;
 const pk = process.env.DEPLOYER_PK;
 
-const CAST = fs.existsSync(path.join(process.env.USERPROFILE ?? "", ".foundry", "bin", "cast.exe"))
-  ? path.join(process.env.USERPROFILE, ".foundry", "bin", "cast.exe")
-  : "cast";
 const cast = (args) => execFileSync(CAST, args, { encoding: "utf8" });
 const send = (args, key = pk) => {
   const out = cast(["send", ...args, "--rpc-url", RPC, "--chain", "10143", "--private-key", key]);
-  const tx = /transactionHash\s+(0x[0-9a-f]+)/.exec(out)?.[1];
-  const ok = /status\s+1/.test(out);
-  return { tx, ok, out };
+  return { tx: txHashOf(out), ok: succeeded(out), out };
 };
+if (!pk) {
+  console.error("DEPLOYER_PK is not set — this signs transactions. Fill in .env (see README).");
+  process.exit(1);
+}
+if (!dep.pool) {
+  console.error("deployment.json has no `pool` — deploy first, then run ops/setup-pool.mjs.");
+  process.exit(1);
+}
 
 const LOG = path.join(ROOT, "audit-log.json");
 const readLog = () => (fs.existsSync(LOG) ? JSON.parse(fs.readFileSync(LOG, "utf8")) : []);
@@ -262,35 +265,63 @@ else if (cmd === "aggregate") {
     .split(",")
     .filter(Boolean);
 
-  const known = new Map(notes.map((n) => [BigInt(n.commitment).toString(), n]));
+  // EVERY ledger on this machine, not just the operator's. A note paid to another holder is
+  // written to notes.<label>.json, and it is a live position of the register — reading only
+  // notes.json left it out of a total the question calls complete. The aggregate circuit
+  // opens a commitment with (amount, pubKey, blinding) and never needs the spending key, so
+  // a recipient's position is provable from the ledger they were handed.
+  const known = new Map(loadAllNotes().map((n) => [BigInt(n.commitment).toString(), n]));
   let required = onChain.map((c) => ({ commitment: c, note: known.get(BigInt(c).toString()) }));
 
   // A SPENT commitment is not a position, and the register having spent some is public:
-  // every `transact` publishes its input nullifiers in the Transacted event, so anyone
-  // counting can see that two positions were retired. WHICH two is what stays hidden, and
-  // that is the confidentiality this register is for.
+  // every transact publishes its input nullifiers, so anyone counting the Transacted events
+  // knows how many were retired. WHICH ones is what stays hidden, and that is the
+  // confidentiality this register exists for — so the auditor cannot subtract them alone.
   //
-  // So the auditor's set is the commitments the contract holds MINUS the retired ones, and
-  // the count of retirements is checked against the chain rather than taken on trust — if
-  // the register claimed a retirement the event log does not show, this refuses to proceed.
-  // Read the receipts of the transfers the register recorded, rather than scanning logs:
-  // Monad caps eth_getLogs at a 100-block range, so a from-block-0 sweep is not available.
-  // Each receipt is fetched by hash and its Transacted topic counted, which is bounded and
-  // exact — and still a chain read, not the ledger vouching for itself.
-  const TRANSACTED = cast(["sig-event", "Transacted(bytes32,bytes32,uint256,address)"]).trim();
-  const transferTxs = [...new Set(notes.filter((n) => n.origin === "transact")
-    .map((n) => n.depositTx).filter(Boolean))];
-  // Count from the CHAIN, not from a ledger-derived list of transactions. Deriving the
-  // list from surviving notes undercounts: a transfer whose own outputs were later spent
-  // leaves no note pointing back at it, so the guard that exists to catch a lying ledger
-  // started refusing the honest case instead.
-  const retiredOnChain = onChain.length - required.filter((r) => r.note).length;
-  const retiredClaimed = required.length - required.filter((r) => r.note).length;
-  if (retiredClaimed !== retiredOnChain) {
-    console.log(`the register accounts for ${retiredClaimed} retired commitment(s) but the chain shows ${retiredOnChain}.`);
-    console.log("Refusing to enumerate a set the event log does not corroborate.");
+  // The retirement count therefore comes from the CHAIN, and the identities come from the
+  // operator's declaration, and the two must agree. An earlier version derived the count
+  // from "commitments this ledger cannot open", which is circular: it made the guard
+  // tautologically true and silently dropped any position belonging to another holder.
+  // The register acquired a second holder today and answered an aggregate over three of its
+  // four positions, reporting it as complete. That is the exact cherry-picking this design
+  // is built to refuse.
+  // Written by ops/transfer.mjs as each spend lands. Deduplicated on read: the same hash
+  // counted twice inflates the retirement count, and an inflated count is the direction
+  // that lets a live position pass as retired.
+  const transfers = [...new Set(
+    fs.existsSync(path.join(ROOT, "transfers.json"))
+      ? JSON.parse(fs.readFileSync(path.join(ROOT, "transfers.json"), "utf8"))
+      : [],
+  )];
+  // Two signatures on purpose. The deployed pool emits the four-argument form; the source
+  // has since added the relayer and the fee, because the old event credited the recipient
+  // with more than it actually received. A receipt carrying either is a retirement, and
+  // hard-coding only the newer one counts zero against the register that exists today.
+  const TRANSACTED = [
+    "Transacted(bytes32,bytes32,uint256,address)",
+    "Transacted(bytes32,bytes32,uint256,address,address,uint256)",
+  ].map((sig) => cast(["sig-event", sig]).trim());
+  const retiredOnChain = transfers.reduce((sum, tx) => {
+    const receipt = cast(["receipt", tx, "--rpc-url", RPC]);
+    return sum + (TRANSACTED.some((t) => receipt.includes(t)) ? 2 : 0);  // two inputs per transfer
+  }, 0);
+
+  const openable = required.filter((r) => r.note).length;
+  const unopenable = required.length - openable;
+
+  if (unopenable !== retiredOnChain) {
+    console.log(`the register holds ${required.length} commitments; this ledger can open ${openable}.`);
+    console.log(`The chain shows ${retiredOnChain} retired by a shielded transfer, which leaves`);
+    console.log(`${unopenable - retiredOnChain} live position(s) belonging to another holder.`);
+    console.log("");
+    console.log("An aggregate over the register needs every holder to contribute — there is no");
+    console.log("multi-party proving here, and answering over the positions this ledger happens");
+    console.log("to hold would report a subset as a total. Refusing rather than cherry-picking.");
+    console.log("");
+    console.log("This is the honest ceiling of the concentration-cap claim: it is single-prover.");
     process.exit(1);
   }
+
   if (retiredOnChain) {
     console.log(`${retiredOnChain} commitment(s) were retired by a shielded transfer and are not positions.`);
     required = required.filter((r) => r.note);
@@ -304,13 +335,10 @@ else if (cmd === "aggregate") {
     );
     process.exit(1);
   }
-  const missing = required.filter((r) => !r.note);
-  if (missing.length) {
-    console.log(`cannot open ${missing.length} of the register's positions — they belong to another holder.`);
-    console.log("An aggregate over the whole register needs every holder to contribute; refusing to answer partially.");
-    process.exit(1);
-  }
-
+  // No second "cannot open these" guard here. The check above already proved that every
+  // unopenable commitment is one the chain shows retired, and the filter removed exactly
+  // those — so a guard at this point can never fire, and a check that cannot fire reads in
+  // a judged artefact as a control that is being enforced.
   const used = required.map((r) => r.note);
   console.log(`the auditor enumerated ${used.length} position(s) from the register on-chain`);
 

@@ -22,10 +22,10 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { secp256k1 } from "./secp.mjs";
-import { Cleanverse } from "./cleanverse.mjs";
+import { client } from "./cleanverse.mjs";
 import { CHAIN, ROOT } from "./env.mjs";
 
-const cv = new Cleanverse();
+const cv = client();
 const FILE = path.join(ROOT, "wallets.json");
 
 const load = () => (fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, "utf8")) : []);

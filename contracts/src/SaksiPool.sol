@@ -314,6 +314,39 @@ contract SaksiPool is Ownable {
         return _eligible(who) && !_denied(who);
     }
 
+    /// ERC-1400 status codes, as ERC-1066 spells them. A compliance predicate that answers
+    /// only "no" is much less useful than it looks: this register refuses for three quite
+    /// different reasons — the credential, the anchored set, the sanctions list — and an
+    /// integrator who gets a bare `false` cannot tell which, though the three demand
+    /// completely different actions. Sort your credential out, wait for the issuer to
+    /// rebuild, or you are sanctioned.
+    bytes1 public constant STATUS_HALTED = 0x54;
+    bytes1 public constant STATUS_INVALID_SENDER = 0x56;
+    bytes1 public constant STATUS_INVALID_RECEIVER = 0x57;
+    bytes1 public constant STATUS_INSUFFICIENT_BALANCE = 0x52;
+    bytes1 public constant STATUS_OK = 0x51;
+
+    /// The same predicate as `canTransfer`, and the reason it decided.
+    ///
+    /// This is the console's "Am I eligible?" screen expressed for a machine: it already
+    /// names which of the three conditions failed for a human, and could not tell an
+    /// integration.
+    function canTransferWithReason(address from, address to, uint256 amount)
+        external
+        view
+        returns (bytes1 code, bytes32 reason)
+    {
+        if (paused) return (STATUS_HALTED, "REGISTER_PAUSED");
+        if (!_eligible(from)) return (STATUS_INVALID_SENDER, "SENDER_NOT_CREDENTIALED");
+        if (_denied(from)) return (STATUS_INVALID_SENDER, "SENDER_SANCTIONED");
+        if (!_eligible(to)) return (STATUS_INVALID_RECEIVER, "RECIPIENT_NOT_CREDENTIALED");
+        if (_denied(to)) return (STATUS_INVALID_RECEIVER, "RECIPIENT_SANCTIONED");
+        if (amount > asset.balanceOf(address(this))) {
+            return (STATUS_INSUFFICIENT_BALANCE, "EXCEEDS_BACKING");
+        }
+        return (STATUS_OK, "");
+    }
+
     /// ERC-3643 ICompliance.canTransfer. Both edges must be credentialed and neither may be
     /// sanctioned, and the register must be able to back the amount — which is the same
     /// pair of checks `transact` makes on a withdrawal, asked in advance.

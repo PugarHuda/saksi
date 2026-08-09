@@ -2,9 +2,9 @@
 //   CV_API_ID=... CV_API_KEY=... node scripts/smoke.mjs
 
 import "./env.mjs";
-import { Cleanverse, rule } from "./cleanverse.mjs";
+import { client } from "./cleanverse.mjs";
 
-const cv = new Cleanverse();
+const cv = client();
 const CHAINS = ["solana", "base", "avalanche", "arbitrum", "ethereum",
                 "polygon", "bsc", "monad", "hashkey", "platon"];
 const PROBE = "0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb0";

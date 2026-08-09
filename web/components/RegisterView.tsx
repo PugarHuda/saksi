@@ -17,19 +17,36 @@ export default function RegisterView({
   measurement: Measurement | null;
 }) {
   const d = live.data;
+  // commitmentCount() is every leaf ever inserted, spent ones included — it is a tree size,
+  // not a holding. Labelling it "positions held" put an 8 above a table of four and made the
+  // landing page, which counts live positions, look wrong.
+  const inserted = d ? Number(d.positions) : null;
+  const retired = inserted !== null ? inserted - positions.length : null;
 
   return (
     <div className="grid">
       {measurement && <WhyThisMatters m={measurement} />}
       <section className="grid three">
         <div className="card">
-          <h2>Positions held</h2>
+          <h2>Commitments inserted</h2>
           <p className="stat shielded mono">
             {live.status === "loading" ? <Skeleton w="3em" /> : d ? String(d.positions) : "—"}
           </p>
           <p className="note" style={{ margin: "8px 0 0" }}>
-            Commitments in the register. What a commitment hides is not the entry — it is the
-            link between a position and wherever it goes next.
+            {retired !== null && retired >= 0 ? (
+              <>
+                <strong>
+                  {positions.length} live · {retired} retired by a shielded transfer
+                </strong>
+                . The tree only grows: spending a note nullifies it but leaves its leaf in
+                place, so this figure counts every commitment the register has ever held.
+              </>
+            ) : (
+              <>
+                The tree only grows: spending a note nullifies it but leaves its leaf in place,
+                so this figure counts every commitment the register has ever held.
+              </>
+            )}
           </p>
         </div>
 
@@ -120,11 +137,13 @@ export default function RegisterView({
       <section className="card">
         <h2>The register</h2>
         <p className="note">
-          Every row is a position this contract is holding. Entry is public by construction —
-          the deposit transaction in the last column carries a visible sender and a visible
-          ERC-20 amount, so today these figures are reconstructible from the chain. The
-          commitment is what makes them unreadable <em>after</em> a position moves: a JoinSplit
-          spends notes and creates new ones that cannot be linked back to this row.
+          Every row is a live position this contract is holding, and they did not all arrive
+          the same way. A <strong>deposit</strong> row was admitted under the association-set
+          root named beside it, and its entry is public by construction: the transaction in the
+          last column carries a visible sender and a visible ERC-20 amount, so that figure is
+          reconstructible from the chain. A <strong>transfer</strong> row was created inside the
+          register by a JoinSplit — it carries no association-set proof and no entry
+          transaction, because it never entered; it moved.
         </p>
 
         {positions.length === 0 ? (
@@ -142,31 +161,47 @@ export default function RegisterView({
                   <th scope="col">Amount held</th>
                   <th scope="col">Current holder</th>
                   <th scope="col">Admitted under root</th>
-                  <th scope="col">Entered</th>
-                  <th scope="col">Entry tx</th>
+                  <th scope="col">Created</th>
+                  <th scope="col">Transaction</th>
                 </tr>
               </thead>
               <tbody>
-                {positions.map((p) => (
-                  <tr key={p.commitment}>
-                    <td className="mono">{short(p.commitment, 10, 8)}</td>
-                    <td>
-                      <Redacted />
-                    </td>
-                    <td>
-                      <Redacted width={5} />
-                    </td>
-                    <td className="mono" style={{ fontSize: "var(--t-xs)" }}>
-                      {short(p.aspRoot, 8, 6)}
-                    </td>
-                    <td className="mono" style={{ fontSize: "var(--t-xs)" }}>
-                      {new Date(p.provedAt).toISOString().replace("T", " ").slice(0, 16)}
-                    </td>
-                    <td>
-                      <Tx hash={p.depositTx} />
-                    </td>
-                  </tr>
-                ))}
+                {positions.map((p) => {
+                  // No association-set proof is carried by transact(), so a transfer output
+                  // was never "admitted under" any root and has no entry transaction.
+                  const moved = p.origin === "transact";
+                  return (
+                    <tr key={p.commitment}>
+                      <td className="mono">
+                        {short(p.commitment, 10, 8)}
+                        {moved && (
+                          <span className="note" style={{ display: "block" }}>
+                            created by transfer
+                          </span>
+                        )}
+                      </td>
+                      <td>
+                        <Redacted />
+                      </td>
+                      <td>
+                        <Redacted width={5} />
+                      </td>
+                      <td className="mono" style={{ fontSize: "var(--t-xs)" }}>
+                        {moved ? (
+                          <span className="note">not admitted — never entered</span>
+                        ) : (
+                          short(p.aspRoot, 8, 6)
+                        )}
+                      </td>
+                      <td className="mono" style={{ fontSize: "var(--t-xs)" }}>
+                        {new Date(p.provedAt).toISOString().replace("T", " ").slice(0, 16)}
+                      </td>
+                      <td>
+                        <Tx hash={p.depositTx} label={moved ? "transfer tx" : undefined} />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -181,12 +216,20 @@ export default function RegisterView({
         <p className="note" style={{ marginTop: 12 }}>
           <strong>Where the shielding starts, precisely.</strong> Entry is public by
           construction: a deposit transaction has a visible sender and moves a visible ERC-20
-          amount, so the chain already links this commitment to the wallet that opened it. What
-          the register conceals is the book <em>after</em> positions move — a JoinSplit spends
-          notes and creates new ones without publishing an amount or an owner, so who holds
-          what stops tracking who deposited what. We do not publish the entry mapping in this
-          bundle either, but that is courtesy rather than a guarantee, and it would be
+          amount, so the chain already links a deposited commitment to the wallet that opened
+          it. What the register conceals is the book <em>after</em> positions move — a JoinSplit
+          spends notes and creates new ones without publishing an amount or an owner, so who
+          holds what stops tracking who deposited what. We do not publish the entry mapping in
+          this bundle either, but that is courtesy rather than a guarantee, and it would be
           dishonest to present it as one.
+        </p>
+        <p className="note" style={{ marginTop: 12 }}>
+          <strong>And one limit on the notes actually on this chain.</strong> The circuit
+          publishes no amount, but the splitter that produced these particular transfers used a
+          fixed 37/63 ratio. Anyone who knows the input can therefore recompute both outputs, so
+          a reviewer should assume the current figures are readable. That is a property of this
+          demo run, not of the construction — but the construction is not what is deployed here,
+          and the difference is the reviewer&apos;s to check, not ours to gloss.
         </p>
       </section>
     </div>

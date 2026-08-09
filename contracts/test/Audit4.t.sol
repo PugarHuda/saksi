@@ -1122,4 +1122,78 @@ contract Audit4Test is Test {
         }
         assertTrue(sawProof);
     }
+
+    // ---- ERC-3643 / ERC-1400 compatibility ---------------------------------
+    //
+    // The register answers in the shape the standard the incumbents build on already uses,
+    // and answers WHY — three refusals that demand three different actions used to collapse
+    // into one boolean.
+
+    function test_X1_CanTransferComposesAllThreeEntryControls() public {
+        _deposit(holder, bytes32(uint256(2001)), 100e6);   // the register must back something
+        assertTrue(pool.canTransfer(holder, holder, 1), "a credentialed pair may transfer");
+        assertTrue(pool.isVerified(holder), "and is verified in the standard's spelling");
+
+        validator.setEligible(holder, false);
+        assertFalse(pool.canTransfer(holder, holder, 1), "gate one refuses");
+        assertFalse(pool.isVerified(holder));
+        validator.setEligible(holder, true);
+
+        uint256[8] memory list;
+        list[0] = pool.sourceKeyOf(holder);
+        pool.setDenyList(list);
+        assertFalse(pool.canTransfer(holder, holder, 1), "the sanctions list refuses");
+        assertFalse(pool.isVerified(holder), "and isVerified reads the list too");
+    }
+
+    function test_X2_ReasonCodesNameWhichControlRefused() public {
+        _deposit(holder, bytes32(uint256(2002)), 100e6);
+        bytes1 code;
+        bytes32 why;
+
+        (code, why) = pool.canTransferWithReason(holder, holder, 1);
+        assertEq(code, pool.STATUS_OK(), "0x51 is ERC-1066 for allowed");
+
+        validator.setEligible(holder, false);
+        (code, why) = pool.canTransferWithReason(holder, payee, 1);
+        assertEq(code, pool.STATUS_INVALID_SENDER());
+        assertEq(why, bytes32("SENDER_NOT_CREDENTIALED"));
+
+        validator.setEligible(holder, true);
+        validator.setEligible(payee, false);
+        (code, why) = pool.canTransferWithReason(holder, payee, 1);
+        assertEq(code, pool.STATUS_INVALID_RECEIVER(), "the two edges are distinguishable");
+        assertEq(why, bytes32("RECIPIENT_NOT_CREDENTIALED"));
+
+        validator.setEligible(payee, true);
+        uint256[8] memory list;
+        list[0] = pool.sourceKeyOf(payee);
+        pool.setDenyList(list);
+        (code, why) = pool.canTransferWithReason(holder, payee, 1);
+        assertEq(why, bytes32("RECIPIENT_SANCTIONED"), "sanctioned is not the same as uncredentialed");
+
+        uint256[8] memory empty;
+        pool.setDenyList(empty);
+        (code, why) = pool.canTransferWithReason(holder, payee, type(uint256).max);
+        assertEq(code, pool.STATUS_INSUFFICIENT_BALANCE());
+        assertEq(why, bytes32("EXCEEDS_BACKING"));
+
+        pool.setPaused(true);
+        (code, why) = pool.canTransferWithReason(holder, payee, 1);
+        assertEq(code, pool.STATUS_HALTED(), "a halted register says so rather than blaming the parties");
+        assertEq(why, bytes32("REGISTER_PAUSED"));
+    }
+
+    /// The standard's views must not revert, whatever Cleanverse's contract does. A
+    /// predicate that throws is worse than one that says no, because an integration cannot
+    /// tell a refusal from an outage.
+    function test_X3_TheStandardViewsNeverRevert() public {
+        _deposit(holder, bytes32(uint256(2003)), 100e6);
+        validator.setRegistered(false);   // an unregistered pool makes their contract revert
+        assertFalse(pool.canTransfer(holder, holder, 1), "reverting validator reads as refusal");
+        assertFalse(pool.isVerified(holder));
+        (bytes1 code,) = pool.canTransferWithReason(holder, holder, 1);
+        assertEq(code, pool.STATUS_INVALID_SENDER());
+        validator.setRegistered(true);
+    }
 }

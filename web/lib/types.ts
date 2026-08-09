@@ -91,4 +91,8 @@ export type Position = {
   depositTx?: string;
   provedAt: string;
   aspRoot: string;
+  // "transact" = an output of a shielded transfer, not a deposit. Such a commitment carries
+  // no association-set proof and no entry transaction, so it must not be rendered as one.
+  // Absent on older bundles, which is why every read of it is optional.
+  origin?: string;
 };

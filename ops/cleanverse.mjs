@@ -39,6 +39,52 @@ const ENCRYPTED = new Set([
   "validator/set_paused",
 ]);
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** One fetch, retried with backoff.
+ *
+ *  Every call in this file used to be a bare `fetch`, so a single transient 429 in the
+ *  middle of a 732-wallet enumeration aborted the whole run. `asp.mjs` is right to refuse
+ *  to build an association set when a read fails — which makes a backoff worth more, not
+ *  less: without one the correct refusal fires on noise.
+ *
+ *  What is retried is deliberately narrow. A 429 was rejected before the server did
+ *  anything, so replaying it is safe on any endpoint. A 5xx is NOT safe to replay on a
+ *  write — the request may have been processed — so 5xx is only retried for reads, which
+ *  is exactly the complement of the ENCRYPTED allowlist above. Transport failures are
+ *  treated the same way for the same reason. */
+async function fetchRetry(url, init, { idempotent, tries = 5 } = {}) {
+  for (let i = 0; ; i++) {
+    let res;
+    try {
+      res = await fetch(url, init);
+    } catch (e) {
+      if (!idempotent || i >= tries) throw e;
+      await sleep(400 * 2 ** i);
+      continue;
+    }
+    const again = res.status === 429 || (idempotent && res.status >= 500);
+    if (!again || i >= tries) return res;      // hand the real status to the caller
+    const after = Number(res.headers.get("retry-after"));
+    await sleep(after > 0 ? Math.min(after, 30) * 1000 : 400 * 2 ** i);
+  }
+}
+
+/** Construct the client, or fail in one honest line.
+ *
+ *  Missing credentials are an operator error, not a defect: every script here is run from a
+ *  terminal by someone who cloned the repo and has not filled in `.env` yet. Thrown from
+ *  the constructor at module top level, that arrives as a nine-line ESM stack trace with
+ *  the actionable sentence buried in the middle of it. */
+export function client(opts) {
+  try {
+    return new Cleanverse(opts);
+  } catch (e) {
+    console.error(`${e.message} — set CV_API_ID and CV_API_KEY in .env (see README).`);
+    process.exit(1);
+  }
+}
+
 export class Cleanverse {
   #key;
   constructor({ apiId, apiKey, base = SANDBOX } = {}) {
@@ -61,15 +107,21 @@ export class Cleanverse {
   /** POST to `path`. Encryption is chosen by the endpoint, not by the caller. */
   async post(path, payload = {}) {
     const encrypted = ENCRYPTED.has(path);
-    const res = await fetch(`${this.base}/${path}`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "api-id": this.apiId,
-        "X-Request-ID": randomUUID(),
+    const res = await fetchRetry(
+      `${this.base}/${path}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "api-id": this.apiId,
+          "X-Request-ID": randomUUID(),
+        },
+        body: JSON.stringify(encrypted ? { data: this.#encrypt(payload) } : payload),
       },
-      body: JSON.stringify(encrypted ? { data: this.#encrypt(payload) } : payload),
-    });
+      // The encrypted allowlist IS the set of writes, so it doubles as the replay guard:
+      // everything outside it is a read and safe to send again.
+      { idempotent: !encrypted },
+    );
     const text = await res.text();
     let body;
     // A transport failure carries no business code, so checking the code first turned
@@ -87,14 +139,72 @@ export class Cleanverse {
     return body.data;
   }
 
+  /** The same treatment post() got. Without it a 404 arrived as `[undefined] undefined`:
+   *  a transport failure carries no business code and no JSON body, so reading `body.code`
+   *  first reports nothing at all about what went wrong. */
   async get(path, params = {}) {
     const qs = new URLSearchParams(params).toString();
-    const res = await fetch(`${this.base}/${path}${qs ? `?${qs}` : ""}`, {
-      headers: { "api-id": this.apiId, "X-Request-ID": randomUUID() },
-    });
-    const body = await res.json();
-    if (body.code !== "0000") throw new Error(`${path}: [${body.code}] ${body.message}`);
+    const res = await fetchRetry(
+      `${this.base}/${path}${qs ? `?${qs}` : ""}`,
+      { headers: { "api-id": this.apiId, "X-Request-ID": randomUUID() } },
+      { idempotent: true },                     // a GET is a read by definition
+    );
+    const text = await res.text();
+    if (!res.ok) throw new Error(`${path}: HTTP ${res.status} ${text.slice(0, 200)}`);
+    let body;
+    try { body = JSON.parse(text); }
+    catch { throw new Error(`${path}: HTTP ${res.status}, non-JSON body: ${text.slice(0, 200)}`); }
+    if (body.code !== "0000") {
+      const err = new Error(`${path}: [${body.code}] ${body.message}`);
+      err.code = body.code;
+      err.body = body;
+      throw err;
+    }
     return body.data;
+  }
+
+  /** Sweep a paged endpoint to the end of the population.
+   *
+   *  Two callers carried the same stop condition —
+   *      if (items.length < 100 || page * 100 >= (res.total ?? 0)) break;
+   *  — and a response without `total` makes the right-hand side `page * 100 >= 0`, which is
+   *  true on page one. A truncated population then reads as a complete one, silently. That
+   *  is the exact failure class that already cost this project seven eighths of its
+   *  association set, so the stop condition here is only ever a SHORT PAGE, and running out
+   *  of pages throws rather than returning what it happened to get. */
+  async sweep(fetchPage, { pageSize = 100, maxPages = 50, what = "page" } = {}) {
+    const all = [];
+    for (let page = 1; page <= maxPages; page++) {
+      const items = await fetchPage(page, pageSize);
+      all.push(...items);
+      if (items.length < pageSize) return all;
+    }
+    throw new Error(
+      `${what}: more than ${maxPages * pageSize} rows and still a full page. ` +
+      `Refusing to report a truncated population as a complete one.`,
+    );
+  }
+
+  /** Every A-Pass row for these filters, not the first page of them. */
+  queryApassAll(params = {}) {
+    return this.sweep(
+      async (page, pageSize) =>
+        (await this.queryApassList({ ...params, page, pageSize })).items ?? [],
+      { what: "query_apass_list" },
+    );
+  }
+
+  /** Every A-Token this institution has applied for. The server's default page size is 20
+   *  against a total in the hundreds, so an unparameterised call is a sample, not a list. */
+  listAllMyAtokens(params = {}) {
+    return this.sweep(
+      async (page, page_size) => {
+        const batch = await this.listMyAtokens({ ...params, page, page_size });
+        const items = batch?.items ?? batch?.list ?? batch;
+        return Array.isArray(items) ? items : [];
+      },
+      { what: "atoken/list_my_atokens" },
+    );
   }
 
   // ---- A-Pass (CVI) ----------------------------------------------------

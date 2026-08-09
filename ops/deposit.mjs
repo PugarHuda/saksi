@@ -20,19 +20,12 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import * as snarkjs from "snarkjs";
 import { makePoseidon, buildTree } from "./merkle.mjs";
-import { noteTools, randomField, saveNote, FIELD } from "./note.mjs";
+import { noteTools, randomField, saveNote } from "./note.mjs";
 import { sourceKeyOf } from "./asp.mjs";
-import { ROOT, RPC, readDeployment } from "./env.mjs";
+import { CAST, ROOT, RPC, readAsp, readDeployment, succeeded, txHashOf } from "./env.mjs";
 
 const dep = readDeployment();
-const aspPath = ["asp.json", "asp.public.json"]
-  .map((f) => path.join(ROOT, f))
-  .find((p) => fs.existsSync(p));
-if (!aspPath) {
-  console.error("no association set on disk — run `node ops/asp.mjs build` first.");
-  process.exit(1);
-}
-const asp = JSON.parse(fs.readFileSync(aspPath, "utf8"));
+const asp = readAsp();
 // Which holder is entering. The register's whole point is that several PEOPLE hold
 // positions in it, not that one wallet holds several notes, so the depositor has to be
 // selectable:  node ops/deposit.mjs 640 --as fund
@@ -42,22 +35,38 @@ const asLabel = (() => {
 })();
 const holder = (() => {
   if (!asLabel) return { address: process.env.DEPLOYER_ADDRESS, priv: process.env.DEPLOYER_PK };
-  const ws = JSON.parse(fs.readFileSync(path.join(ROOT, "wallets.json"), "utf8"));
+  // wallets.json is gitignored, so a clone does not have it — say that instead of ENOENT.
+  const f = path.join(ROOT, "wallets.json");
+  if (!fs.existsSync(f)) {
+    console.error(`--as ${asLabel} needs wallets.json, which is not in this clone (it holds keys).`);
+    console.error("Run `node ops/apass.mjs new <label> <ISO2>` to create one, or drop --as to");
+    console.error("deposit from the issuer wallet in .env.");
+    process.exit(1);
+  }
+  const ws = JSON.parse(fs.readFileSync(f, "utf8"));
   // Last match wins: seed-holders appends, so the freshest wallet for a label is the live
   // one — an older entry for the same label has already spent its balance.
   const w = [...ws].reverse().find((x) => x.label === asLabel && x.priv);
-  if (!w) throw new Error(`no wallet labelled ${asLabel} carrying a key in wallets.json`);
+  if (!w) {
+    console.error(`no wallet labelled ${asLabel} carrying a key in wallets.json`);
+    process.exit(1);
+  }
   return w;
 })();
 const who = holder.address;
 const pk = holder.priv;
+if (!/^0x[0-9a-fA-F]{40}$/.test(who ?? "") || !pk) {
+  console.error("no depositor — set DEPLOYER_ADDRESS and DEPLOYER_PK in .env (see README), or pass --as.");
+  process.exit(1);
+}
+if (!dep.pool || !dep.asset) {
+  console.error("deployment.json has no `pool`/`asset` — deploy first, then run ops/setup-pool.mjs.");
+  process.exit(1);
+}
 const dry = process.argv.includes("--dry");
 const amountUnits = Number(process.argv[2] ?? 250);
 const amount = BigInt(Math.round(amountUnits * 1e6));      // 6 decimals
 
-const CAST = fs.existsSync(path.join(process.env.USERPROFILE ?? "", ".foundry", "bin", "cast.exe"))
-  ? path.join(process.env.USERPROFILE, ".foundry", "bin", "cast.exe")
-  : "cast";
 const cast = (args) => execFileSync(CAST, args, { encoding: "utf8" }).trim();
 
 // ---- 1. membership witness -------------------------------------------------
@@ -173,6 +182,9 @@ const artifact = {
   binding: { bA, bB, bC, bind },
   provedAt: new Date().toISOString(),
 };
+// .artifacts is gitignored, so from a clone the directory does not exist and this threw
+// ENOENT after the proving had already been paid for. transfer.mjs creates it; this did not.
+fs.mkdirSync(path.join(ROOT, ".artifacts"), { recursive: true });
 fs.writeFileSync(path.join(ROOT, ".artifacts", "last-deposit.json"), JSON.stringify(artifact, null, 2));
 
 if (dry) { console.log("\n--dry: not sending"); process.exit(0); }
@@ -197,7 +209,7 @@ const out = cast(["send", dep.pool,
   // settled, and reports the failure as InvalidProof rather than as a missing allowance.
   // The same calldata simulates clean with eth_call, so the estimate is what is wrong.
   // Fixed limit, generously above the ~2.91M two Groth16 verifications actually cost.
-  "--gas-limit", "3600000",
+  "--gas-limit", "3100000",   // actual is ~2.91M; Monad charges the limit, so do not pad it
   "--rpc-url", RPC, "--chain", "10143", "--private-key", pk]);
 const lines = out.split("\n").filter((l) => /^(status|transactionHash|gasUsed|blockNumber)/.test(l));
 console.log(lines.join("\n"));
@@ -205,11 +217,11 @@ console.log(lines.join("\n"));
 // A mined-but-reverted deposit still prints a transaction hash. Recording the note anyway
 // would leave notes.json holding a position the pool never stored, and the next audit
 // would prove against a commitment the contract has never heard of.
-if (!/^status\s+1/m.test(out)) {
+if (!succeeded(out)) {
   throw new Error("deposit transaction reverted — refusing to record a position the register does not hold");
 }
 
-const txHash = /transactionHash\s+(0x[0-9a-f]+)/.exec(out)?.[1];
+const txHash = txHashOf(out);
 artifact.depositTx = txHash;
 saveNote(artifact);
 fs.writeFileSync(path.join(ROOT, ".artifacts", "last-deposit.json"), JSON.stringify(artifact, null, 2));

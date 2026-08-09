@@ -11,10 +11,10 @@
 // today ended ISSUE_FAILED), so a failed application is retried rather than fatal.
 
 import "./env.mjs";
-import { Cleanverse, rule } from "./cleanverse.mjs";
+import { client, rule } from "./cleanverse.mjs";
 import { writeDeployment, readDeployment, CHAIN } from "./env.mjs";
 
-const cv = new Cleanverse();
+const cv = client();
 const admin = process.env.DEPLOYER_ADDRESS;
 if (!admin) throw new Error("DEPLOYER_ADDRESS missing from .env");
 

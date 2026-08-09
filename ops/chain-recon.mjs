@@ -1,10 +1,10 @@
 // What is on Monad right now: our gas balance, and the canonical aUSDC pair.
 //   node ops/chain-recon.mjs
 import "./env.mjs";
-import { Cleanverse } from "./cleanverse.mjs";
+import { client } from "./cleanverse.mjs";
 import { RPC, CHAIN } from "./env.mjs";
 
-const cv = new Cleanverse();
+const cv = client();
 
 async function rpc(method, params) {
   const r = await fetch(RPC, {

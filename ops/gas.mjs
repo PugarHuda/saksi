@@ -13,9 +13,7 @@
 // the summary were missing: they were compile-time constants with no price attached.
 
 import "./env.mjs";
-import fs from "node:fs";
-import path from "node:path";
-import { ROOT, RPC, readDeployment } from "./env.mjs";
+import { CAST, ROOT, RPC, readDeployment, readOrExit } from "./env.mjs";
 
 const dep = readDeployment();
 
@@ -44,15 +42,16 @@ const sig = (n) => `verifyProof(uint256[2],uint256[2][2],uint256[2],uint256[${n}
 // Recover each selector rather than trusting a table: a wrong one estimates as a fallback
 // and silently returns a number that means nothing.
 const { execFileSync } = await import("node:child_process");
-const CAST = fs.existsSync(path.join(process.env.USERPROFILE ?? "", ".foundry", "bin", "cast.exe"))
-  ? path.join(process.env.USERPROFILE, ".foundry", "bin", "cast.exe")
-  : "cast";
 for (const n of Object.keys(SEL)) {
   SEL[n] = execFileSync(CAST, ["sig", sig(n)], { encoding: "utf8" }).trim();
 }
 
-const audit = JSON.parse(fs.readFileSync(path.join(ROOT, "audit-log.json"), "utf8"));
+const audit = readOrExit("audit-log.json", "no proofs to price — run `node ops/audit.mjs threshold 500` first.");
 const KIND_SIGNALS = { exact: 3, threshold: 3, range: 4, aggregate: 13 };
+if (!dep.verifiers) {
+  console.error("deployment.json has no `verifiers` — nothing to estimate against.");
+  process.exit(1);
+}
 
 // Each row: the transaction that carried the proof, the verifier it was checked by, and how
 // many public signals that circuit publishes. The proof itself is always the first

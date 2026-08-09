@@ -16,12 +16,9 @@ import "./env.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { ROOT, RPC, readDeployment } from "./env.mjs";
+import { CAST, ROOT, RPC, readDeployment, readOrExit } from "./env.mjs";
 
 const dep = readDeployment();
-const CAST = fs.existsSync(path.join(process.env.USERPROFILE ?? "", ".foundry", "bin", "cast.exe"))
-  ? path.join(process.env.USERPROFILE, ".foundry", "bin", "cast.exe")
-  : "cast";
 const cast = (args) => execFileSync(CAST, [...args, "--rpc-url", RPC], { encoding: "utf8" });
 
 const receipt = (hash) => {
@@ -33,7 +30,7 @@ const receipt = (hash) => {
   };
 };
 
-const audit = JSON.parse(fs.readFileSync(path.join(ROOT, "audit-log.json"), "utf8"));
+const audit = readOrExit("audit-log.json", "no disclosures recorded — run `node ops/audit.mjs exact` first.");
 const exact = audit.find((a) => a.kind === "exact");
 
 // The four transactions, in the order they happened. The hashes are the ones the other

@@ -1,10 +1,14 @@
 // Which chains actually succeed at atoken/launch right now?
 //   node ops/atoken-recon.mjs
-import { Cleanverse } from "./cleanverse.mjs";
+import "./env.mjs";
+import { client } from "./cleanverse.mjs";
 
-const cv = new Cleanverse();
-const list = await cv.listMyAtokens();
-const items = list.items ?? list.list ?? list;
+const cv = client();
+// Every row, not the server's default first 20. The tally below reads as a statement about
+// the whole population — "monad/ISSUED 14" — and against 357 rows it was a statement about
+// the first page.
+const items = await cv.listAllMyAtokens();
+console.log(`${items.length} application rows\n`);
 
 const tally = {};
 for (const it of items) {

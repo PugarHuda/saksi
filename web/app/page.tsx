@@ -35,7 +35,11 @@ export default function Landing() {
   // The one request nobody could answer. It is the strongest thing on this page, so it is
   // read from the evidence file rather than written into the copy — if a future run ever
   // answers it, this section disappears instead of quietly becoming a lie.
-  const unanswered = audit.find((a) => !a.verified);
+  //
+  // findLast, not find: the first unanswered request is a reporting-bracket question, and a
+  // bracket refusal reads as "we don't know". The last one is the concentration cap every
+  // other document quotes — "this register cannot lie" only lands on that one.
+  const unanswered = audit.findLast((a) => !a.verified);
 
   // The visual is not decoration and not stock art: it is the register's own commitments,
   // tiled into a field. This is what the chain actually shows an observer — the positions

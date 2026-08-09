@@ -47,15 +47,39 @@ export const loadNotes = (file = notesFile()) => {
   return Array.isArray(raw) ? raw : (raw.notes ?? []);
 };
 
-export function saveNote(note) {
-  const all = loadNotes();
+/** Append to the ledger the process is actually working with.
+ *
+ *  This read through notesFile() and wrote back to FILE, so `NOTES=notes.holder2.json node
+ *  ops/deposit.mjs …` loaded the recipient's ledger and saved it into the operator's —
+ *  copying another holder's positions, and their spending key with them, into notes.json.
+ *  Read and write have to name the same file. */
+export function saveNote(note, file = notesFile()) {
+  const all = loadNotes(file);
   all.push(note);
-  fs.writeFileSync(FILE, JSON.stringify(all, null, 2) + "\n");
+  const raw = fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf8")) : all;
+  // Preserve the recipient shape: a per-holder ledger is an object carrying its spending
+  // key, and flattening it to a bare array would drop the key.
+  fs.writeFileSync(
+    file,
+    JSON.stringify(Array.isArray(raw) ? all : { ...raw, notes: all }, null, 2) + "\n",
+  );
   return all.length - 1;
 }
 
-export function replaceNotes(all) {
-  fs.writeFileSync(FILE, JSON.stringify(all, null, 2) + "\n");
+/** Every position on this machine, across every holder ledger.
+ *
+ *  An aggregate that enumerates one ledger cannot honestly say "across ALL registered
+ *  positions" — a note paid to another holder lives in notes.<label>.json, and reading only
+ *  notes.json silently leaves it out of the total.
+ *
+ *  ponytail: local ledger files, which is what a single-machine demo has. A register with
+ *  holders on separate machines needs each of them to contribute their own openings; the
+ *  refusal in ops/audit.mjs is what keeps that honest rather than guessed at. */
+export function loadAllNotes() {
+  const files = fs.readdirSync(ROOT)
+    .filter((f) => f === "notes.json" || (/^notes\..+\.json$/.test(f) && f !== "notes.public.json"))
+    .map((f) => path.join(ROOT, f));
+  return files.flatMap((f) => loadNotes(f).map((n) => ({ ...n, ledger: path.basename(f) })));
 }
 
-export { FIELD, FILE as NOTES_FILE };
+export { FIELD };

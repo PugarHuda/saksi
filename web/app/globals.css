@@ -182,7 +182,10 @@ a { color: inherit; }
 .stat.accent { color: var(--accent); }
 .stat.shielded { color: var(--shielded); }
 
-.kv { display: grid; grid-template-columns: minmax(120px, auto) 1fr; gap: 6px 14px; margin: 0; }
+/* minmax(0, 1fr), not 1fr: a bare 1fr track has an automatic minimum, so any child with a
+   large min-content width — a hash, a shell command — widens the grid past its container
+   instead of wrapping inside it. */
+.kv { display: grid; grid-template-columns: minmax(120px, auto) minmax(0, 1fr); gap: 6px 14px; margin: 0; }
 .kv dt { color: var(--muted); font-size: var(--t-xs); letter-spacing: 0.03em; text-transform: uppercase; }
 .kv dd { margin: 0; word-break: break-all; }
 
@@ -305,9 +308,12 @@ input[type="text"]::placeholder { color: var(--muted); }
   font-size: var(--t-sm);
 }
 
+/* `clip` is a paint-time effect, so long visually-hidden text still counted towards the
+   document's scrollable width. clip-path removes it from layout overflow as well. */
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
-  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
+  white-space: nowrap; border: 0;
 }
 
 footer.foot {
@@ -685,8 +691,13 @@ footer.foot {
   border: 1px solid var(--border);
   border-radius: var(--r-sm);
   font-size: var(--t-2xs);
-  overflow-wrap: anywhere;
   padding: 3px 6px;
+  /* It wraps. `white-space: pre` with an x-scrollbar reads better, but a cast command has no
+     break opportunity, so its min-content width becomes the grid track's floor and the whole
+     document scrolled 1161px sideways at 375. A tall command block is not a defect; a page
+     that scrolls sideways on a phone is. */
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 .btn.copy { font-size: var(--t-2xs); font-weight: 500; min-height: 28px; padding: 3px 9px; }
 

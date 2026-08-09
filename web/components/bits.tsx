@@ -73,6 +73,9 @@ export function Copyable({ cmd }: { cmd: string }) {
       <button
         type="button"
         className="btn ghost copy"
+        // aria-label, not an .sr-only span: a 1200px unbreakable command inside one made
+        // the whole document scroll sideways at 375px, clip rule notwithstanding.
+        aria-label={`Copy command: ${cmd}`}
         onClick={() => {
           navigator.clipboard?.writeText(cmd).then(
             () => {
@@ -84,7 +87,6 @@ export function Copyable({ cmd }: { cmd: string }) {
         }}
       >
         {done ? "Copied" : "Copy"}
-        <span className="sr-only"> command: {cmd}</span>
       </button>
     </span>
   );

@@ -6,10 +6,10 @@
 // attribution for a value transfer is Cleanverse's to produce, not ours to invent.
 
 import "./env.mjs";
-import { Cleanverse } from "./cleanverse.mjs";
+import { client } from "./cleanverse.mjs";
 import { CHAIN } from "./env.mjs";
 
-const cv = new Cleanverse();
+const cv = client();
 const [tx, address = process.env.DEPLOYER_ADDRESS] = process.argv.slice(2);
 if (!tx) {
   console.error("usage: node ops/travel-rule.mjs <txHash> [walletAddress]");

@@ -37,6 +37,14 @@ export default function RegulatorView({
   positions: Position[];
 }) {
   const answered = audit.filter((a) => a.verified);
+  const exact = audit.filter((a) => a.kind === "exact");
+  // The newest position on file. Every position-specific audit here was asked about a
+  // commitment that has since been spent, so an audit older than this is not a statement
+  // about anything currently on screen — say so rather than let the two tables imply it.
+  const newestPosition = positions.reduce<string | null>(
+    (max, p) => (max === null || p.provedAt > max ? p.provedAt : max),
+    null,
+  );
 
   return (
     <div className="grid">
@@ -62,13 +70,13 @@ export default function RegulatorView({
           </p>
         </div>
         <div className="card">
-          <h2>Positions disclosed</h2>
-          <p className="stat mono">
-            {audit.filter((a) => a.kind === "exact").length}
-            <span style={{ fontSize: "var(--t-lg)", color: "var(--muted)" }}> / {positions.length}</span>
-          </p>
+          <h2>Answers that revealed a figure</h2>
+          <p className="stat mono">{exact.length}</p>
           <p className="note" style={{ margin: "8px 0 0" }}>
-            Only the exact disclosures reveal a figure. The rest answered without one.
+            Only an exact disclosure names a number; every other kind answered without one. This
+            is not a fraction of the {positions.length} live position
+            {positions.length === 1 ? "" : "s"} — the commitments these were asked about have
+            since been spent, and a spent note is not a position.
           </p>
         </div>
       </section>
@@ -111,9 +119,17 @@ export default function RegulatorView({
                       </Badge>
                       <strong style={{ fontSize: "var(--t-md)" }}>{copy.title} disclosure</strong>
                       <span className="note" style={{ display: "inline", marginLeft: "auto" }}>
-                        proved in {a.proveMs} ms
+                        {a.at.replace("T", " ").slice(0, 16)} UTC · proved in {a.proveMs} ms
                       </span>
                     </div>
+
+                    {newestPosition && a.at < newestPosition && (
+                      <p className="note" style={{ margin: "0 0 8px" }}>
+                        Asked before the newest position existed — the commitment behind this
+                        answer has since been spent, so it is not one of the rows on the
+                        Register tab.
+                      </p>
+                    )}
 
                     <p style={{ margin: "0 0 4px" }}>
                       <span style={{ color: "var(--muted)" }}>Question — </span>

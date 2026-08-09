@@ -1,5 +1,8 @@
-// Loads .env from the repo root into process.env without a dependency.
+// Loads .env from the repo root into process.env without a dependency, and holds the few
+// facts every ops script needs: where the repo is, where the chain is, where cast is, and
+// how to read the two files the scripts share.
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -29,4 +32,44 @@ export function writeDeployment(patch) {
   const next = { ...readDeployment(), ...patch };
   fs.writeFileSync(DEPLOY_FILE, JSON.stringify(next, null, 2) + "\n");
   return next;
+}
+
+/** Foundry's cast. Eight files carried this three-line dance, and two of them disagreed
+ *  about where the home directory comes from — `os.homedir()` is the one that also works
+ *  where the binary is not called cast.exe. */
+export const CAST = (() => {
+  const local = path.join(os.homedir(), ".foundry", "bin",
+    process.platform === "win32" ? "cast.exe" : "cast");
+  return fs.existsSync(local) ? local : "cast";
+})();
+
+/** The two fields every caller pulls out of a `cast send` / `cast receipt` table. Anchored,
+ *  because an unanchored /status\s+1/ matches inside other fields of the same receipt. */
+export const txHashOf = (out) => /^transactionHash\s+(0x[0-9a-fA-F]+)/m.exec(out)?.[1] ?? null;
+export const succeeded = (out) => /^status\s+1/m.test(out);
+
+/** The association set: the raw build when it is present, the published one otherwise.
+ *  Five scripts inlined this, and the fallback is load-bearing — `asp.json` is gitignored,
+ *  so a clone only ever has `asp.public.json`.
+ *
+ *  ponytail: exits rather than throwing, because all five call sites did exactly that. */
+export function readAsp() {
+  const found = ["asp.json", "asp.public.json"]
+    .map((f) => path.join(root, f))
+    .find((f) => fs.existsSync(f));
+  if (!found) {
+    console.error("no association set on disk — run `node ops/asp.mjs build` first.");
+    process.exit(1);
+  }
+  return JSON.parse(fs.readFileSync(found, "utf8"));
+}
+
+/** A JSON artefact a script depends on, or one honest line instead of an ENOENT trace. */
+export function readOrExit(file, how) {
+  const p = path.isAbsolute(file) ? file : path.join(root, file);
+  if (!fs.existsSync(p)) {
+    console.error(`${path.basename(p)} not found — ${how}`);
+    process.exit(1);
+  }
+  return JSON.parse(fs.readFileSync(p, "utf8"));
 }

@@ -23,7 +23,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import * as snarkjs from "snarkjs";
-import { ROOT, RPC, readDeployment } from "./env.mjs";
+import { CAST, ROOT, RPC, readDeployment, readOrExit, succeeded, txHashOf } from "./env.mjs";
 import { makePoseidon, buildTree } from "./merkle.mjs";
 
 const LEVELS = 10;
@@ -36,22 +36,28 @@ const asLabel = (() => {
   return i > 0 ? process.argv[i + 1] : "issuer";
 })();
 
-const CAST = fs.existsSync(path.join(process.env.USERPROFILE ?? "", ".foundry", "bin", "cast.exe"))
-  ? path.join(process.env.USERPROFILE, ".foundry", "bin", "cast.exe")
-  : "cast";
 const run = (args) => execFileSync(CAST, args, { encoding: "utf8" });
 const call = (to, sig, ...a) => run(["call", to, sig, ...a, "--rpc-url", RPC]).trim();
 const send = (pk, args) =>
   run(["send", ...args, "--rpc-url", RPC, "--chain", "10143", "--gas-limit", "5000000",
        "--private-key", pk]);
 
-const wallets = JSON.parse(fs.readFileSync(path.join(ROOT, "wallets.json"), "utf8"));
+// wallets.json is gitignored — it holds keys — so from a clone it is simply absent, and
+// this read used to end the script in an ENOENT stack trace. The issuer from .env is the
+// honest fallback: it is the one holder a clone can be configured for.
+const wallets = fs.existsSync(path.join(ROOT, "wallets.json"))
+  ? JSON.parse(fs.readFileSync(path.join(ROOT, "wallets.json"), "utf8"))
+  : [];
 const owner = [...wallets].reverse().find((w) => w.label === "issuer" && w.priv)
   ?? { address: process.env.DEPLOYER_ADDRESS, priv: process.env.DEPLOYER_PK };
 const spender = [...wallets].reverse().find((w) => w.label === asLabel && w.priv) ?? owner;
+if (!spender.priv || !spender.address) {
+  console.error(`no key for '${asLabel}' — wallets.json is absent and DEPLOYER_PK/DEPLOYER_ADDRESS are not set.`);
+  process.exit(1);
+}
 
-const notes = JSON.parse(fs.readFileSync(path.join(ROOT, "notes.json"), "utf8"));
-const mine = notes.filter((n) => n.wallet.toLowerCase() === spender.address.toLowerCase());
+const notes = readOrExit("notes.json", "no positions to spend — run `node ops/deposit.mjs 250` first.");
+const mine = notes.filter((n) => n.wallet?.toLowerCase() === spender.address.toLowerCase());
 if (mine.length < 2) {
   console.error(`${asLabel} holds ${mine.length} position(s); a JoinSplit spends two.`);
   console.error("Deposit twice from the same wallet, or pass --as for a holder that has.");
@@ -280,9 +286,19 @@ const out = send(spender.priv, [dep.pool,
   "transact(uint256[2],uint256[2][2],uint256[2],uint256[7],address,address,uint256)",
   fmt(pA), fmt2(pB), fmt(pC), fmt(pub), recipient, relayer, fee.toString()]);
 console.log(out.split("\n").filter((l) => /^(status|transactionHash|gasUsed|blockNumber)/.test(l)).join("\n"));
-if (!/^status\s+1/m.test(out)) throw new Error("transact reverted — nothing recorded");
+if (!succeeded(out)) throw new Error("transact reverted — nothing recorded");
 
-const txHash = /transactionHash\s+(0x[0-9a-f]+)/.exec(out)?.[1];
+const txHash = txHashOf(out);
+
+// Record the spend where the auditor can count it. ops/audit.mjs derives the number of
+// RETIRED commitments by reading these receipts from the chain — two inputs per transfer —
+// and compares it against the commitments this machine cannot open. A transfer missing from
+// this list makes the two disagree and the aggregate refuses, which is the safe direction
+// but only because the list is written here rather than maintained by hand.
+const TRANSFERS = path.join(ROOT, "transfers.json");
+const transfers = fs.existsSync(TRANSFERS) ? JSON.parse(fs.readFileSync(TRANSFERS, "utf8")) : [];
+if (txHash && !transfers.includes(txHash)) transfers.push(txHash);
+fs.writeFileSync(TRANSFERS, JSON.stringify(transfers, null, 2) + "\n");
 
 // The spent notes are gone and the new ones are the register's; record them so the next
 // aggregate proof enumerates what the pool actually holds.

@@ -57,6 +57,10 @@ for (const entry of files) {
       depositTx: n.depositTx,
       provedAt: n.provedAt,
       aspRoot: n.aspRoot,
+      // `origin` says whether a commitment was deposited or created by a shielded transfer.
+      // It reveals nothing the transaction hash does not, and without it the console
+      // rendered transfer outputs as deposits — under a root they were never admitted by.
+      origin: n.origin,
     }));
   }
   fs.writeFileSync(dst, JSON.stringify(data, null, 2));

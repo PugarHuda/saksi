@@ -11,20 +11,13 @@
 import "./env.mjs";
 import fs from "node:fs";
 import path from "node:path";
-import { ROOT, RPC, readDeployment } from "./env.mjs";
+import { ROOT, RPC, readAsp, readDeployment, readOrExit } from "./env.mjs";
 
 const dep = readDeployment();
 const md = process.argv.includes("--md");
-const audit = JSON.parse(fs.readFileSync(path.join(ROOT, "audit-log.json"), "utf8"));
-const notes = JSON.parse(fs.readFileSync(path.join(ROOT, "notes.public.json"), "utf8"));
-const aspPath = ["asp.json", "asp.public.json"]
-  .map((f) => path.join(ROOT, f))
-  .find((p) => fs.existsSync(p));
-if (!aspPath) {
-  console.error("no association set on disk — run `node ops/asp.mjs build` first.");
-  process.exit(1);
-}
-const asp = JSON.parse(fs.readFileSync(aspPath, "utf8"));
+const audit = readOrExit("audit-log.json", "no disclosures yet — run `node ops/audit.mjs threshold 500`.");
+const notes = readOrExit("notes.public.json", "no positions yet — run `node ops/deposit.mjs 250`.");
+const asp = readAsp();
 
 async function rpc(method, params) {
   const r = await fetch(RPC, {
@@ -52,17 +45,21 @@ const line = (s = "") => out.push(s);
 line(md ? "### Live reads — repeat any of these against `https://testnet-rpc.monad.xyz`" : "LIVE READS");
 line();
 if (md) line("```");
+// The return TYPE is a property of the function, not of the value it happens to return.
+// Rendering "any 0 or 1 is a boolean" printed a register holding one commitment as
+// `pool.commitmentCount()  true`, and an empty register as `false` — in the table this
+// project offers as the reproducible evidence for its own numbers.
 const reads = [
-  ["pool.registeredWithValidator()", dep.pool, "0x612f004d"],
-  ["pool.commitmentCount()", dep.pool, "0xc44956d1"],
-  ["pool.aspRoot()", dep.pool, "0xd4401eaa"],
-  ["asset.totalSupply()", dep.asset, "0x18160ddd"],
-  ["asset.balanceOf(pool)", dep.asset, "0x70a08231" + pad(dep.pool)],
+  ["pool.registeredWithValidator()", dep.pool, "0x612f004d", "bool"],
+  ["pool.commitmentCount()", dep.pool, "0xc44956d1", "uint"],
+  ["pool.aspRoot()", dep.pool, "0xd4401eaa", "uint"],
+  ["asset.totalSupply()", dep.asset, "0x18160ddd", "uint"],
+  ["asset.balanceOf(pool)", dep.asset, "0x70a08231" + pad(dep.pool), "uint"],
 ];
-for (const [name, to, data] of reads) {
+for (const [name, to, data, type] of reads) {
   const v = await call(to, data);
   const n = BigInt(v === "0x" ? "0x0" : v);
-  line(`${name.padEnd(34)} ${n === 0n || n === 1n ? (n === 1n ? "true" : "false") : n.toString()}`);
+  line(`${name.padEnd(34)} ${type === "bool" ? String(n === 1n) : n.toString()}`);
 }
 // complianceVerify(address,address) and isRegistered(address) on Cleanverse's validator.
 const CV = "0xaf375463";
@@ -174,7 +171,12 @@ for (const n of notes) {
 line();
 line(`association set: ${asp.admitted} members, root ${asp.root.slice(0, 20)}…`);
 if (asp.dropped?.length) {
-  line(`last rebuild dropped: ${asp.dropped.map((d) => `${d.label ?? ""} ${d.wallet}`).join(", ")}`);
+  // A dropped member this project does not operate is published as a leaf, with no wallet
+  // on it. Interpolating the absent field printed `last rebuild dropped: undefined` into
+  // the evidence table — name the leaf instead, which is what the published set carries.
+  line(`last rebuild dropped: ${asp.dropped
+    .map((d) => `${d.label ?? ""} ${d.wallet ?? `leaf ${String(d.sourceKey).slice(0, 12)}…`}`.trim())
+    .join(", ")}`);
 }
 
 console.log(out.join("\n"));

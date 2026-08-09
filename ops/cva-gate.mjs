@@ -16,7 +16,7 @@
 import "./env.mjs";
 import fs from "node:fs";
 import path from "node:path";
-import { Cleanverse, APASS_VERDICT, apassVerdictCode } from "./cleanverse.mjs";
+import { client, APASS_VERDICT, apassVerdictCode } from "./cleanverse.mjs";
 import { ROOT, CHAIN, RPC, readDeployment } from "./env.mjs";
 
 const args = process.argv.slice(2);
@@ -40,7 +40,7 @@ const dep = readDeployment();
 const ATOKEN = dep.atoken;
 if (!ATOKEN) { console.error("deployment.json has no `atoken`"); process.exit(1); }
 
-const cv = new Cleanverse();
+const cv = client();
 
 // ---- subjects -----------------------------------------------------------
 const given = args.filter((a) => /^0x[0-9a-fA-F]{40}$/.test(a));

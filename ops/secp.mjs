@@ -4,14 +4,7 @@
 // If ops ever needs this in a browser or a hot loop, swap in @noble/secp256k1.
 
 import { execFileSync } from "node:child_process";
-import path from "node:path";
-import os from "node:os";
-import fs from "node:fs";
-
-const CAST = (() => {
-  const local = path.join(os.homedir(), ".foundry", "bin", "cast.exe");
-  return fs.existsSync(local) ? local : "cast";
-})();
+import { CAST } from "./env.mjs";
 
 const run = (args) => execFileSync(CAST, args, { encoding: "utf8" }).trim();
 

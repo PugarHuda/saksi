@@ -11,12 +11,9 @@ import "./env.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { ROOT, RPC, readDeployment } from "./env.mjs";
+import { CAST, ROOT, RPC, readDeployment } from "./env.mjs";
 
 const dep = readDeployment();
-const CAST = fs.existsSync(path.join(process.env.USERPROFILE ?? "", ".foundry", "bin", "cast.exe"))
-  ? path.join(process.env.USERPROFILE, ".foundry", "bin", "cast.exe")
-  : "cast";
 const run = (args, env) =>
   execFileSync(args[0], args.slice(1), { encoding: "utf8", env: { ...process.env, ...env } });
 const cast = (args) => run([CAST, ...args, "--rpc-url", RPC, "--chain", "10143",

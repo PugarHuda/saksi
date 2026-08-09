@@ -11,10 +11,9 @@
 // middle, which is exactly the kind of thing that goes wrong at 3am before a deadline.
 
 import "./env.mjs";
-import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { ROOT, RPC, CHAIN, readDeployment, writeDeployment } from "./env.mjs";
+import { CAST, ROOT, RPC, readAsp, readDeployment, txHashOf, writeDeployment } from "./env.mjs";
 
 const pool = process.argv[2];
 if (!/^0x[0-9a-fA-F]{40}$/.test(pool ?? "")) {
@@ -22,16 +21,13 @@ if (!/^0x[0-9a-fA-F]{40}$/.test(pool ?? "")) {
   process.exit(1);
 }
 
-const CAST = fs.existsSync(path.join(process.env.USERPROFILE ?? "", ".foundry", "bin", "cast.exe"))
-  ? path.join(process.env.USERPROFILE, ".foundry", "bin", "cast.exe")
-  : "cast";
 const run = (cmd, args) => execFileSync(cmd, args, { encoding: "utf8", stdio: ["ignore", "pipe", "inherit"] });
 const cast = (args) =>
   run(CAST, [...args, "--rpc-url", RPC, "--chain", "10143", "--private-key", process.env.DEPLOYER_PK]);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const step = (n, what) => console.log(`\n${n}. ${what}`);
-const txOf = (out) => /transactionHash\s+(0x[0-9a-f]+)/.exec(out)?.[1] ?? "?";
+const txOf = (out) => txHashOf(out) ?? "?";
 
 step(1, "record the new pool");
 writeDeployment({ pool, poolHistory: [...(readDeployment().poolHistory ?? []), readDeployment().pool].filter(Boolean) });
@@ -55,14 +51,7 @@ if (!auditor) {
 }
 
 step(5, "anchor the current association-set root");
-const aspPath = ["asp.json", "asp.public.json"]
-  .map((f) => path.join(ROOT, f))
-  .find((p) => fs.existsSync(p));
-if (!aspPath) {
-  console.error("no association set on disk — run `node ops/asp.mjs build` first.");
-  process.exit(1);
-}
-const asp = JSON.parse(fs.readFileSync(aspPath, "utf8"));
+const asp = readAsp();
 const out = cast(["send", pool, "rotateRoot(uint256)", asp.root]);
 console.log(`   root ${asp.root.slice(0, 24)}…  tx ${txOf(out)}`);
 

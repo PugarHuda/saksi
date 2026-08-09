@@ -28,8 +28,8 @@
 import "./env.mjs";
 import fs from "node:fs";
 import path from "node:path";
-import { Cleanverse } from "./cleanverse.mjs";
-import { ROOT, RPC, CHAIN } from "./env.mjs";
+import { client } from "./cleanverse.mjs";
+import { ROOT, RPC, CHAIN, readAsp, readDeployment } from "./env.mjs";
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -87,20 +87,13 @@ async function balancesOf(token, addrs) {
 const pad = (a) => a.replace(/^0x/, "").toLowerCase().padStart(64, "0");
 const uint = (hex) => BigInt(hex === "0x" || !hex ? "0x0" : hex);
 
-const cv = new Cleanverse();
+const cv = client();
 const head = Number(await rpc("eth_blockNumber", []));
 
 // ---- the eligible population -------------------------------------------------
 
 const wallets = new Map(); // address -> label
-const aspPath = ["asp.json", "asp.public.json"]
-  .map((f) => path.join(ROOT, f))
-  .find((p) => fs.existsSync(p));
-if (!aspPath) {
-  console.error("no association set on disk — run `node ops/asp.mjs build` first.");
-  process.exit(1);
-}
-const asp = JSON.parse(fs.readFileSync(aspPath, "utf8"));
+const asp = readAsp();
 // The published set reduces members this project does not operate to one-way leaves, so a
 // census run from a clone can only address the wallets it can see. Say what is missing
 // rather than throwing on the first redacted member.
@@ -116,33 +109,26 @@ for (const m of addressable) wallets.set(m.wallet.toLowerCase(), m.label ?? "");
 // registry has ever listed on this chain — frozen and expired included — because a wallet
 // that once held a credential could have received the asset while it was valid and may
 // still hold it. Anything narrower would undercount holders and flatter the result.
-for (let page = 1; page <= 20; page++) {
-  const res = await cv.queryApassList({ chain: CHAIN, page, pageSize: 100 });
-  const items = res.items ?? [];
-  for (const it of items) {
-    if (/^0x[0-9a-fA-F]{40}$/.test(it.walletAddress ?? "")) {
-      if (!wallets.has(it.walletAddress.toLowerCase())) wallets.set(it.walletAddress.toLowerCase(), "");
-    }
+// Swept in cleanverse.mjs, which stops only on a short page. The condition here used to
+// also stop on `page * 100 >= (res.total ?? 0)`, and a response missing `total` makes that
+// true on page one — a truncated population reading as a complete census.
+for (const it of await cv.queryApassAll({ chain: CHAIN })) {
+  if (/^0x[0-9a-fA-F]{40}$/.test(it.walletAddress ?? "")) {
+    if (!wallets.has(it.walletAddress.toLowerCase())) wallets.set(it.walletAddress.toLowerCase(), "");
   }
-  if (items.length < 100 || page * 100 >= (res.total ?? 0)) break;
 }
 
 // ---- every CVA on this chain -------------------------------------------------
 
 const tokens = new Map(); // address -> symbol
-// Paginate. The documented default page size is 20 against hundreds of rows, so a single
-// unparameterised call quietly measured the first page and called it the population.
-for (let page = 1; page <= 20; page++) {
-  let batch;
-  try { batch = await cv.listMyAtokens({ page, page_size: 100 }); }
-  catch (e) { console.log(`list_my_atokens page ${page}: ${e.message}`); break; }
-  const items = batch.items ?? batch.list ?? batch ?? [];
-  for (const it of items) {
-    if (it.chain === CHAIN && it.applyStatus === "ISSUED" && /^0x[0-9a-fA-F]{40}$/.test(it.atokenAddress ?? "")) {
-      tokens.set(it.atokenAddress.toLowerCase(), it.tokenSymbol ?? "?");
-    }
+// Paginated. The server's default page size is 20 against a total in the hundreds, so a
+// single unparameterised call quietly measured the first page and called it the population.
+// A failure here is fatal rather than a `break`: a short asset list makes every headline
+// below smaller than the truth, and this measurement exists to be quoted.
+for (const it of await cv.listAllMyAtokens()) {
+  if (it.chain === CHAIN && it.applyStatus === "ISSUED" && /^0x[0-9a-fA-F]{40}$/.test(it.atokenAddress ?? "")) {
+    tokens.set(it.atokenAddress.toLowerCase(), it.tokenSymbol ?? "?");
   }
-  if (items.length < 100) break;
 }
 try {
   const pairs = await cv.post("query_deposit_atoken_list", { chain: CHAIN });
@@ -177,9 +163,15 @@ const addresses = [...wallets.keys()];
 // read path is lying rather than the balance being zero. The pool is deliberately NOT
 // used as a probe: after a redeploy it legitimately holds nothing, and a self-check that
 // fires on a true zero teaches you to ignore it.
-const dep0 = JSON.parse(fs.readFileSync(path.join(ROOT, "deployment.json"), "utf8"));
+const dep0 = readDeployment();
 const OURS = dep0.asset;
 const issuer = process.env.DEPLOYER_ADDRESS;
+if (!OURS || !/^0x[0-9a-fA-F]{40}$/.test(issuer ?? "")) {
+  console.error("the self-check needs deployment.json `asset` and DEPLOYER_ADDRESS in .env.");
+  console.error("Without it there is no known balance to reproduce, and an unchecked census");
+  console.error("that reads every balance as zero looks exactly like perfect confidentiality.");
+  process.exit(1);
+}
 
 const probe = uint(await call(OURS, "0x70a08231" + pad(issuer)));
 if (probe === 0n) {

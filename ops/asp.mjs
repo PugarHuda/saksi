@@ -19,18 +19,21 @@ import fs from "node:fs";
 import path from "node:path";
 import { keccak_256 } from "./keccak.mjs";
 import { makePoseidon, buildTree } from "./merkle.mjs";
-import { Cleanverse } from "./cleanverse.mjs";
+import { client } from "./cleanverse.mjs";
 import { CHAIN, ROOT, readDeployment, writeDeployment } from "./env.mjs";
 
-const cv = new Cleanverse();
+// Constructed inside `build`, not here. deposit.mjs and gate-gap.mjs import sourceKeyOf
+// from this file and never touch the API — a client at module top level made both of them
+// demand sandbox credentials they have no use for, including the README's quickstart.
 const FILE = path.join(ROOT, "asp.json");
 const WALLETS = path.join(ROOT, "wallets.json");
 const LEVELS = 10;                       // 1024 leaves, matching Compliance(10, 8)
 const FIELD = 21888242871839275222246405745257275088548364400416034343698204186575808495617n;
 
 /** The register's admission rule. Mirrors the rule registered with the Cleanverse
- *  Validator, so the ZK gate and the on-chain gate answer the same question. */
-export const RULE = {
+ *  Validator, so the ZK gate and the on-chain gate answer the same question.
+ *  Not exported: it is copied into asp.json, and that artefact is what other scripts read. */
+const RULE = {
   minTier: 30,
   countries: [],                          // empty = no country constraint at this layer
   requireActive: true,
@@ -39,26 +42,26 @@ export const RULE = {
 export const sourceKeyOf = (addr) =>
   BigInt("0x" + keccak_256(Buffer.from(addr.replace(/^0x/, ""), "hex"))) % FIELD;
 
-async function pullApassPopulation() {
+async function pullApassPopulation(cv) {
   const seen = new Map();
   // No server-side status filter. `status` is null on the overwhelming majority of list
   // rows — sampling them against query_apass returns status 1 every time — so filtering on
   // it server-side dropped roughly seven eighths of the eligible population and left the
   // association set looking like a handful of wallets we happened to know about. Status is
   // decided below, per wallet, from the authoritative per-wallet record.
-  for (let page = 1; page <= 20; page++) {
-    const res = await cv.queryApassList({ chain: CHAIN, page, pageSize: 100 });
-    const items = res.items ?? [];
-    for (const it of items) {
-      const addr = it.walletAddress;
-      if (!addr || !/^0x[0-9a-fA-F]{40}$/.test(addr)) continue;
-      // Several rows can share a wallet (re-registrations). Keep the newest.
-      const prev = seen.get(addr.toLowerCase());
-      if (!prev || (it.registeredAt ?? "") > (prev.registeredAt ?? "")) {
-        seen.set(addr.toLowerCase(), it);
-      }
+  //
+  // The sweep lives in cleanverse.mjs and stops only on a short page. The condition that
+  // used to be here stopped on `page * 100 >= (res.total ?? 0)` as well, and a response
+  // without `total` makes that true on page one — the same silent truncation, one bad
+  // deploy away from costing the population a second time.
+  for (const it of await cv.queryApassAll({ chain: CHAIN })) {
+    const addr = it.walletAddress;
+    if (!addr || !/^0x[0-9a-fA-F]{40}$/.test(addr)) continue;
+    // Several rows can share a wallet (re-registrations). Keep the newest.
+    const prev = seen.get(addr.toLowerCase());
+    if (!prev || (it.registeredAt ?? "") > (prev.registeredAt ?? "")) {
+      seen.set(addr.toLowerCase(), it);
     }
-    if (items.length < 100 || page * 100 >= (res.total ?? 0)) break;
   }
 
   // The bulk list lags: a credential issued minutes ago is live on query_apass but has
@@ -123,7 +126,7 @@ const [cmd = "build", ...args] = process.argv.slice(2);
 
 if (isCli && cmd === "build") {
   const excluded = new Set(args.map((a) => a.toLowerCase()));   // wallets to drop this round
-  const population = await pullApassPopulation();
+  const population = await pullApassPopulation(client());
   const admitted = population.filter(admits)
     .filter((r) => !excluded.has(r.walletAddress.toLowerCase()));
 

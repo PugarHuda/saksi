@@ -254,9 +254,10 @@ export default function HolderView({
               What the commitment protects is everything after that —{" "}
               {deployment.pool && (
                 <>
-                  and the register has already exercised it. One of those positions was later
-                  disclosed in full — but only after a regulator posted the question on-chain,
-                  which is the only way a figure ever leaves this register.
+                  and the register has already exercised it. A position that has since been
+                  spent was once disclosed in full — not one of the positions standing today,
+                  and only after a regulator posted the question on-chain, which is the only way
+                  a figure ever leaves this register.
                 </>
               )}
             </p>

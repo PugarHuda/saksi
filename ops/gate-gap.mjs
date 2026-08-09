@@ -28,25 +28,19 @@ import "./env.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
-import { ROOT, RPC, readDeployment } from "./env.mjs";
+import { CAST, ROOT, RPC, readAsp, readDeployment } from "./env.mjs";
 import { sourceKeyOf } from "./asp.mjs";
 
 const dep = readDeployment();
-const aspPath = ["asp.json", "asp.public.json"]
-  .map((f) => path.join(ROOT, f))
-  .find((p) => fs.existsSync(p));
-if (!aspPath) {
-  console.error("no association set on disk — run `node ops/asp.mjs build` first.");
+const asp = readAsp();
+if (!dep.pool || !dep.validator) {
+  console.error("deployment.json has no `pool`/`validator` — there is nothing to compare the set against.");
   process.exit(1);
 }
-const asp = JSON.parse(fs.readFileSync(aspPath, "utf8"));
 const wallets = fs.existsSync(path.join(ROOT, "wallets.json"))
   ? JSON.parse(fs.readFileSync(path.join(ROOT, "wallets.json"), "utf8"))
   : [];
 
-const CAST = fs.existsSync(path.join(process.env.USERPROFILE ?? "", ".foundry", "bin", "cast.exe"))
-  ? path.join(process.env.USERPROFILE, ".foundry", "bin", "cast.exe")
-  : "cast";
 
 const call = (to, sig, ...args) =>
   execFileSync(CAST, ["call", to, sig, ...args, "--rpc-url", RPC], { encoding: "utf8" }).trim();
@@ -166,24 +160,24 @@ const members = asp.members ?? [];
 // covers a dozen — and reporting that as 524 would be the same over-claim this script
 // already made once, in the one sentence a reader would screenshot.
 const addressable = members.filter((m) => m.wallet).length;
-const CONC = 4; // the public RPC rate-limits well below this on bursts
-let cursor = 0;
 const refused = [];
 let unanswered = 0;
 
-async function worker() {
-  for (;;) {
-    const i = cursor++;
-    if (i >= members.length) return;
-    const m = members[i];
-    if (!m.wallet) continue; // a leaf-only member is not addressable here
+// ponytail: serial, because `call` is execFileSync and four workers over a synchronous
+// body ran strictly one at a time anyway — the Promise.all around it bought nothing but a
+// comment claiming concurrency. If the sweep gets slow, the upgrade is eth_call over fetch
+// (evidence.mjs already does that) rather than more workers around a blocking subprocess.
+function sweep() {
+  let done = 0;
+  for (const m of members) {
+    if (!m.wallet) continue;                  // a leaf-only member is not addressable here
     try {
       const ok = call(dep.validator, "complianceVerify(address,address)(bool)", dep.pool, m.wallet);
       if (ok.trim() !== "true") refused.push(m);
     } catch {
       unanswered++;
     }
-    if (i % 50 === 0) process.stdout.write(`\r  swept ${i}/${members.length}`);
+    if (++done % 25 === 0) process.stdout.write(`\r  swept ${done}/${addressable}`);
   }
 }
 
@@ -197,8 +191,8 @@ if (addressable < members.length) {
   console.log(`set. Sweeping the ${addressable} that carry an address.`);
 }
 console.log(`\nsweeping ${addressable} of ${members.length} members against Cleanverse's validator…`);
-await Promise.all(Array.from({ length: CONC }, worker));
-process.stdout.write(`\r  swept ${members.length}/${members.length}\n\n`);
+sweep();
+process.stdout.write(`\r  swept ${addressable}/${addressable}\n\n`);
 
 if (unanswered) {
   console.log(`${unanswered} member(s) the validator would not answer about — counted as unknown,`);

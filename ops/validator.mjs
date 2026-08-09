@@ -17,11 +17,11 @@
 // recovers it against the pool's Ownable.owner(), which is why SaksiPool exposes one.
 
 import "./env.mjs";
-import { Cleanverse, rule } from "./cleanverse.mjs";
+import { client, rule } from "./cleanverse.mjs";
 import { secp256k1 } from "./secp.mjs";
 import { CHAIN, readDeployment, writeDeployment } from "./env.mjs";
 
-const cv = new Cleanverse();
+const cv = client();
 const dep = readDeployment();
 const pool = process.env.POOL ?? dep.pool;
 const pk = process.env.DEPLOYER_PK;
