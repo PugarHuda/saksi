@@ -1,15 +1,17 @@
 pragma circom 2.1.6;
 
-// Tukar — Shielded transfer (JoinSplit) circuit
+// Saksi — Shielded transfer (JoinSplit) circuit
 // -----------------------------------------------------------------------------
-// The private core of the corridor. Spends nIns input notes and creates nOuts
+// The private core of the register. Spends nIns input notes and creates nOuts
 // output notes, proving — without revealing amounts or owners:
 //   * ownership of each input note (knowledge of its private key),
 //   * correct nullifier per input (prevents double-spending),
 //   * Merkle membership of each spent note in the pool tree,
 //   * value conservation: sum(in) + publicAmount == sum(out).
-// publicAmount is the only public value (positive = deposit, negative = withdraw,
-// zero = pure private transfer). Derived from the Tornado-Nova JoinSplit design.
+// publicAmount is the only public value. Negative — encoded as FIELD - x — is a
+// withdrawal; zero is a pure internal transfer. POSITIVE IS REFUSED ON-CHAIN
+// (DepositsUseDepositPath): value enters this register only through deposit(), which is
+// gated, and letting it arrive through the spend path would bypass both entry gates. Derived from the Tornado-Nova JoinSplit design.
 //
 // Note scheme (shared with disclosure.circom):
 //   pubKey     = Poseidon(privKey)

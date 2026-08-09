@@ -8,7 +8,7 @@
 A confidential holder register for tokenized real-world assets.
 Built on Cleanverse CVI and CVA · deployed on Monad testnet.
 
-[Live console](https://saksi-gilt.vercel.app) · [Pool on explorer](https://testnet.monadexplorer.com/address/0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA) · [One-page summary](SUMMARY.md)
+[Live console](https://saksi-gilt.vercel.app) · [Pool on explorer](https://testnet.monadexplorer.com/address/0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA) · [Summary](SUMMARY.md)
 
 </div>
 
@@ -109,7 +109,22 @@ auditor registered **before the answer existed**:
 The aggregate case is the strict one. Its context hash is a Poseidon commitment over the
 enumerated positions *and* their active flags, and the circuit recomputes that hash — so a
 holder cannot answer by leaving a position out. The report is complete or there is no
-proof.
+proof. What the circuit cannot check is whether the *enumeration* was complete; that is a
+tooling job, and it is where we got it wrong today. See the limits.
+
+### It answers in the incumbent's shape
+
+ERC-3643 (T-REX) carries most of the tokenized-RWA supply in existence, so the cheapest
+adoption path is to answer its two questions rather than invent new ones. `isVerified(address)`
+and `canTransfer(from, to, amount)` compose all three entry controls — credential, anchored set,
+sanctions list — in T-REX's spelling, and `canTransferWithReason` returns an ERC-1066 status
+byte plus a reason so an integrator can tell *which* control refused. A bare `false` collapses
+three situations that demand three different actions: sort your credential out, wait for the
+issuer to rebuild, or you are sanctioned.
+
+These are the admission predicate, not the shielded ledger — they answer about addresses, which
+is what ERC-3643 asks about, while the positions inside the register are commitments no standard
+has a question for yet. **They are written and tested but not deployed**; see the limits.
 
 ## What is deployed
 
@@ -135,7 +150,7 @@ cast call 0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA "activeRules()((bytes2,byte
 cast call 0xeBBA114d9870c98250239aCaFbcccc4dA09AF1CA "isEligible(address)(bool)" 0x4490CcB0abdE3D2E494dE5cC118F7D0D74b44639 --rpc-url https://testnet-rpc.monad.xyz
 ```
 
-## Five demonstrations
+## Six demonstrations
 
 **1. The question comes first.** Four disclosure types, all verified on-chain, in
 [`audit-log.json`](audit-log.json). Every request block precedes its answer block — 52210266
@@ -144,11 +159,14 @@ repo. The strongest row is a failure: asked whether total exposure across four p
 was at most 1,000 when it was in fact 1,680, **no proof could be produced**, and request
 `52210907` is still open. The register cannot answer falsely; it can only fail to answer.
 
-**2. The set is faithful, and we can now prove it over the whole population.**
+**2. The set is faithful, and we can now check it over the whole population.**
 `node ops/gate-gap.mjs` asks Cleanverse's validator about **every member of the set**, not a
-sample, and reports the direction of any disagreement. **524 of 524 are admitted by
-Cleanverse too** — the only acceptable result, because the set is *derived* from their
-registry and must never be more permissive than it.
+sample, and reports the direction of any disagreement — because the set is *derived* from their
+registry and must never be more permissive than it. The root was anchored at 10:07 UTC and the
+sweep currently names **one of the 524 that Cleanverse has frozen since**, plus two it would not
+answer about, counted as unknown rather than as agreement. Gate one refuses that member at
+deposit, so no position can be opened on the stale witness — which is the entire reason gate one
+is a live call and not a cached one.
 
 It was more permissive, earlier today. Fifteen credentials Cleanverse had **frozen** were
 holding valid membership witnesses in our set, because removing a broken server-side status
@@ -171,10 +189,14 @@ sanctions list, which refuses `0x…dEaD` even though both gates admit it.
 **3. Revoke and freeze.** A verified holder deposited, then had its A-Pass frozen
 (`update_status` → live record `status: 2`). Both gates closed independently:
 `complianceVerify(pool, holder)` on Cleanverse's validator went `true → false`, and the
-association set rebuilt without it — recorded in `asp.json` as
-`its dropped list`, with the previous set kept in `asp.previous.json`.
-The next deposit reverts `ValidatorRefused` at gate one and has no witness at gate
-two.
+association set rebuilt without it — recorded in the `dropped` list of `asp.public.json`, with
+the previous set kept in `asp.previous.json`. The next deposit reverts `ValidatorRefused` at gate
+one and has no witness at gate two.
+
+> Reproduce it on a wallet that is frozen **now**, not on that one. The credential used for this
+> run has since been reactivated in Cleanverse's shared sandbox, so `complianceVerify` on it
+> returns `true` again; the artefacts above are the record of the run. `gate-gap.mjs` names the
+> wallets both gates refuse at the moment you run it.
 
 > `isEligible(address)` is **Saksi's** view on the pool, which forwards to Cleanverse's
 > `complianceVerify(pool, wallet)`. The validator itself exposes no `isEligible` — that
@@ -198,8 +220,9 @@ node ops/transfer.mjs --as issuer          # prove, publish the note root, spend
 
 This is the operation the whole commitment scheme exists for, and it had never been executed
 on-chain until this build: `noteRoot()` was `0`, which made `transact()` unreachable rather
-than merely undemonstrated. The register now holds eight commitments, four of them live
-positions.
+than merely undemonstrated. At block 52266233 the register held twelve commitments, six of them
+live positions backing 2,315 CVA — it is still being deposited into, so read it rather than
+trusting that line: `node ops/evidence.mjs`.
 
 **5. And value leaves it under the same rules.** A second JoinSplit
 ([`0x08b6801b…`](https://testnet.monadexplorer.com/tx/0x08b6801b1cbcaa681f2a81d77628e4c88dcec9bf70793492663fa605422d0e3a),
@@ -207,15 +230,36 @@ block 52220592) redeemed 50 units out of the register: 49.5 to a credentialed re
 0.5 to a credentialed relayer, with 680 staying shielded inside. The exit is where
 Cleanverse's model is most opinionated — every address receiving a CVA needs a credential —
 so `transact()` calls `complianceVerify` twice more on that path, once for the recipient
-and once for the relayer. The pool's backing went 1,680 → 1,630 and the `Transacted` event
-records `withdrawn = 50000000`; which of the register's positions paid for it does not
-appear anywhere.
+and once for the relayer. That transaction took the pool's backing from 1,680 to 1,630 — later
+deposits have since raised it — and the `Transacted` event records `withdrawn = 50000000`. The chain does not say which position paid for it — though on
+*this* register you can work it out anyway, for a reason we own up to in the limits below.
+
+**6. And the register can mint a position it cannot itself spend.** Every JoinSplit before today
+keyed its outputs to the sender's own fresh key, so the mechanism ran but no position had ever
+left the sender's control. `ops/keygen.mjs` generates a spending key into a separate ledger; the
+sender is given only the public half; and one JoinSplit
+([`0x78168fda…`](https://testnet.monadexplorer.com/tx/0x78168fda9282e1d7933c942c102ab2d53b4049a98cda272b0eb7f23167f1291c),
+block 52244580) paid an output to it. The private half is not in the sender's ledger and never
+was, so the sender cannot spend that position.
+
+```bash
+node ops/keygen.mjs holder2
+node ops/transfer.mjs --as issuer --to-pubkey <pub> --to-label holder2
+```
+
+Claim exactly that and no more. An adversarial review took the stronger version apart, correctly:
+the recipient is a key in a file with no address and no credential, both transactions were signed
+by the same wallet, and every disclosure circuit takes `(amount, pubKey, blinding)` and **no
+private key** — so anyone holding the note's opening, the sender included, can still *answer*
+about it. **Spend authority separated; answer authority did not.** Blocks 52244758 → 52244768
+show that position answered to the auditor under a 600 cap, which demonstrates the disclosure
+path over a separately-keyed note; it does not demonstrate a second party.
 
 
 ## Repository
 
 ```
-contracts/     Foundry. SaksiPool + the seven exported Groth16 verifiers. 89 tests.
+contracts/     Foundry. SaksiPool + the seven exported Groth16 verifiers. 131 tests.
 circuits/      Circom sources, proving keys, witness calculators.
 ops/           The register's operations — issuance, association set, validator
                registration, deposits, disclosures, revocation.
@@ -227,7 +271,7 @@ docs/          Cleanverse API notes, findings, the business plan.
 
 ```bash
 # contracts
-cd contracts && forge test          # 89 passed
+cd contracts && forge test          # 131 passed
 
 # ops — install once, then set CV_API_ID / CV_API_KEY and a funded Monad key in .env
 npm install
@@ -268,9 +312,33 @@ builder, the disclosure flow, the deployment, and the consoles.
   phase-2 randomness, forged proofs are possible and undetectable.
 - **Both gates root in one authority.** They diverge in *time*, not in trust. A compromised
   Cleanverse sandbox defeats both.
-- **`denyList` is an 8-slot fixed array**, and the aggregate circuit is fixed at 5 slots —
-  the register already holds eight commitments, so the aggregate cannot span it and refuses
-  rather than answering over a subset. Merkle depth 10 caps every tree at 1,024 leaves.
+- **Answer authority does not move with a position.** Every disclosure circuit takes
+  `(amount, pubKey, blinding)` and no private key, so anyone holding a note's opening —
+  including whoever built the output — can prove things about it. Only *spend* authority is
+  separable today; binding the spending key into the disclosure circuits is a recompile and a
+  new ceremony.
+- **The aggregate is single-prover, and we published a wrong answer proving it.** Block
+  52245878 answered "total exposure across all **3** registered positions" while four were
+  live: the enumerator counted retirements by what the issuer's ledger could open, which is
+  circular, so it filed the separately-keyed position as retired. The answer is true of the
+  three it names and is not a statement about the register. It cannot be retracted, so
+  `audit-log.json` carries the correction beside the row rather than the row being quietly
+  re-run. `ops/audit.mjs` now counts retirements from the chain and refuses when a live
+  position belongs to a key that has not contributed an opening.
+- **The ERC-3643 views, the ERC-1400 reason codes and the `TREE_CAPACITY` guard are not
+  deployed.** All are in `SaksiPool.sol` and tested, and all revert on the pool at
+  `0xeBBA114d…`. Redeploying would reset the evidence chain above — two permanently open audit
+  requests whose entire value is that they have been open since a specific block.
+- **Which commitments are live is public.** `notes.public.json` publishes them, so
+  set-differencing against `allCommitments()` names the spent ones. What is hidden is which
+  input became which output, and what any of them is worth.
+- **This register's amounts are derivable, and that is our bug.** `ops/transfer.mjs` split
+  each JoinSplit 37/63 — a constant in a public repository — and deposits are plaintext, so
+  every note follows from the deposit log: 730 × 0.37 = 270.1. The splitter now draws from the
+  CSPRNG; the notes already inserted do not. Assume these amounts are readable.
+- **`denyList` is an 8-slot fixed array** and the aggregate circuit is fixed at 5 slots, which
+  the register's five live positions now exactly fill. Merkle depth 10 caps every tree at
+  1,024 leaves.
 - **Single-EOA owner**, no timelock or multisig, who can rotate roots and set the auditor.
 - Everything is Monad testnet, and the Cleanverse sandbox is shared across hackathon teams,
   so the association set contains other participants' credentials as well as ours. That is

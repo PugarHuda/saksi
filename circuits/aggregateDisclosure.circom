@@ -1,11 +1,11 @@
 pragma circom 2.1.6;
 
-// Tukar — Aggregate (portfolio) Selective Disclosure circuit — VARIABLE COUNT
+// Saksi — Aggregate (portfolio) Selective Disclosure circuit — VARIABLE COUNT
 // -----------------------------------------------------------------------------
 // Prove that the SUM of a VARIABLE number (1..N) of confidential payments over a period
 // is at most a reporting cap, WITHOUT revealing any individual amount — the shape of a
 // periodic CTR / threshold report, in zero-knowledge, over the same note commitments the
-// corridor already publishes.
+// register already publishes.
 //
 // A Groth16 circuit is fixed-width, so we support 1..N via public per-slot `active` flags:
 // an ACTIVE slot must open its commitment and contributes its amount to the sum; an

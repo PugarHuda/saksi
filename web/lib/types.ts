@@ -70,6 +70,10 @@ export type AuditEntry = {
   verified: boolean;
   proveMs: number;
   at: string;
+  // Set when an answer already on chain says less than its question implies. It cannot be
+  // retracted, so every surface that shows the row has to show this beside it — an
+  // uncorrected wrong answer on screen is worse than the original mistake.
+  correction?: string;
 };
 
 export type Measurement = {
@@ -90,9 +94,13 @@ export type Position = {
   commitment: string;
   depositTx?: string;
   provedAt: string;
-  aspRoot: string;
-  // "transact" = an output of a shielded transfer, not a deposit. Such a commitment carries
-  // no association-set proof and no entry transaction, so it must not be rendered as one.
-  // Absent on older bundles, which is why every read of it is optional.
-  origin?: string;
+  // null on anything that did not enter through deposit(): a JoinSplit output was admitted
+  // under no root at all. Typed as nullable so the compiler catches a deref rather than the
+  // browser — `short(null)` threw and took the whole Register tab down with it.
+  aspRoot: string | null;
+  // How the commitment came to exist: "deposit", or a JoinSplit output — "transact" for the
+  // sender's change and "received" for the recipient's note. Neither JoinSplit output carries
+  // an association-set proof or an entry transaction, so neither may be rendered as one.
+  // Absent on older bundles, where every row was a deposit.
+  origin?: "deposit" | "transact" | "received";
 };

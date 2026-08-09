@@ -1,9 +1,10 @@
 pragma circom 2.1.6;
 
-// Tukar — Merkle tree update circuit (trustless root registration)
+// Saksi — Merkle tree update circuit (trustless root registration)
 // -----------------------------------------------------------------------------
 // Proves that inserting `newLeaf` at an empty slot of a tree whose root is
-// `oldRoot` yields exactly `newRoot`. The operator must supply this proof to
+// `oldRoot` yields exactly `newRoot`. NOT WIRED. publishNoteRoot(uint256) is onlyOwner and takes no proof, so nothing below
+// is enforced on the deployed register. Were it wired, the operator would supply this proof to
 // advance the pool's root, so they cannot register an arbitrary root — only a
 // correct single-leaf insertion onto the current root. This removes the trust in
 // the operator for tree *integrity* (G6).

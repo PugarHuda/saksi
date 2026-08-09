@@ -92,6 +92,18 @@ export function Copyable({ cmd }: { cmd: string }) {
   );
 }
 
+/** An answer that is already on chain and says less than its question implies. The proof
+ *  cannot be retracted and the row cannot be re-run, so the row is never rendered without
+ *  this beside it — on the Regulator tab and on the Evidence tab both. */
+export function Correction({ children }: { children: React.ReactNode }) {
+  return (
+    <p className="callout correction">
+      <strong>Correction — </strong>
+      {children}
+    </p>
+  );
+}
+
 export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="error" role="alert">

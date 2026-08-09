@@ -12,6 +12,10 @@ const TABS = ["Evidence", "Am I eligible?", "Register", "Two gates", "Issuer", "
 const ISSUER = "0x4490CcB0abdE3D2E494dE5cC118F7D0D74b44639";
 const BURN = "0x000000000000000000000000000000000000dEaD";
 const NO_CREDENTIAL = "0xd57837A934f44216f721877B6B9d77693b70476E";
+/** The one credential this run revoked: complianceVerify() answers false and the rebuilt set
+ *  dropped its leaf, so it is the only subject that is refused by BOTH gates for a live
+ *  reason rather than for never having existed. */
+const FROZEN = "0x2e2ba14f6784b72fe9874b41811193b5b0bdd0ca";
 
 /** Fails the test on the first uncaught error or 4xx/5xx, rather than letting a tab render
  *  half of itself and pass on a text assertion. */
@@ -82,6 +86,15 @@ test("the holder flow agrees with the chain", async ({ page }) => {
   await expect(page.getByText("This wallet cannot enter")).toBeVisible();
   await expect(page.getByText("no witness")).toBeVisible();
 
+  // A revoked credential: refused live, and its leaf was dropped by the last rebuild. Both
+  // gates say no, and neither of the two stale-window callouts may appear — those claim the
+  // gates disagree, and here they do not.
+  await check(page, FROZEN);
+  await expect(page.getByText("This wallet cannot enter")).toBeVisible();
+  await expect(page.getByText("no witness")).toBeVisible();
+  await expect(page.getByText(/This is the window the two gates exist for/)).toHaveCount(0);
+  await expect(page.getByText(/Credentialed after the last rebuild/)).toHaveCount(0);
+
   // Anything that is not a 20-byte address cannot be submitted at all.
   for (const bad of ["", "0x1234", "not-an-address"]) {
     await page.locator("#holder-address").fill(bad);
@@ -110,23 +123,60 @@ test("the evidence tab shows an open request the chain confirms is open", async 
   await expect(page.getByText(/^\+\d+$/).first()).toBeVisible();
 });
 
-test("neither page scrolls sideways on a phone", async ({ page }) => {
-  await page.setViewportSize({ width: 375, height: 900 });
+/** Phone, tablet, laptop. Every sideways-scroll defect this project has had came from one
+ *  child's min-content width — a hash, a cast command, a badge label — escaping its grid
+ *  track, and each was invisible at the width above it. */
+for (const width of [375, 768, 1280]) {
+  test(`no page scrolls sideways at ${width}`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    const overflow = () =>
+      page.evaluate(() => document.scrollingElement!.scrollWidth - window.innerWidth);
 
-  for (const route of ["/", "/console"]) {
-    await page.goto(route);
-    const overflow = await page.evaluate(
-      () => document.scrollingElement!.scrollWidth - window.innerWidth,
-    );
-    expect(overflow, `${route} overflows by ${overflow}px`).toBeLessThanOrEqual(0);
+    for (const route of ["/", "/console"]) {
+      await page.goto(route);
+      expect(await overflow(), `${route} at ${width}`).toBeLessThanOrEqual(0);
+    }
+
+    for (const name of TABS) {
+      await page.getByRole("tab", { name }).click();
+      await expect(page.locator("main .card h2").first()).toBeVisible();
+      expect(await overflow(), `"${name}" at ${width}`).toBeLessThanOrEqual(0);
+    }
+  });
+}
+
+test("a transfer output is not rendered as a deposit", async ({ page }) => {
+  const problems = strict(page);
+  await page.goto("/console");
+  await page.getByRole("tab", { name: "Register" }).click();
+
+  // Both JoinSplit outputs — the sender's change and the recipient's note. Rendering either
+  // as a deposit claims an admission under a root that never happened, and the recipient's
+  // row carries a null root, which threw inside short() and took the whole tab down.
+  const moved = page.getByRole("row").filter({ hasText: "created by transfer" });
+  await expect(moved).toHaveCount(2);
+  for (let i = 0; i < 2; i++) {
+    await expect(moved.nth(i).getByText("not admitted — never entered")).toBeVisible();
+    await expect(moved.nth(i).getByRole("link", { name: "transfer tx" })).toBeVisible();
   }
+  expect(problems, problems.join("\n")).toEqual([]);
+});
 
-  for (const name of TABS) {
-    await page.getByRole("tab", { name }).click();
-    await expect(page.locator("main .card h2").first()).toBeVisible();
-    const overflow = await page.evaluate(
-      () => document.scrollingElement!.scrollWidth - window.innerWidth,
-    );
-    expect(overflow, `"${name}" overflows by ${overflow}px`).toBeLessThanOrEqual(0);
+test("a corrected answer never appears without its correction", async ({ page }) => {
+  await page.goto("/console");
+
+  // The row is the aggregate proved over three of four live positions. The proof is on chain
+  // and cannot be retracted, so both surfaces that show the answer must show what it is an
+  // answer to — an uncorrected wrong answer on screen is worse than the original mistake.
+  for (const tab of ["Regulator", "Evidence"]) {
+    await page.getByRole("tab", { name: tab }).click();
+    await expect(
+      page.getByText(/all 3 registered positions/).first(),
+      `"${tab}" shows the corrected answer`,
+    ).toBeVisible();
+    await expect(
+      page.getByText(/is NOT a statement about the register/).first(),
+      `"${tab}" shows the correction beside it`,
+    ).toBeVisible();
   }
 });

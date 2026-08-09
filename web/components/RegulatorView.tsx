@@ -2,7 +2,7 @@
 
 import { short } from "@/lib/chain";
 import type { AuditEntry, Deployment, Position } from "@/lib/types";
-import { Badge, Empty, Tx } from "./bits";
+import { Badge, Correction, Empty, Tx } from "./bits";
 
 const KIND_COPY: Record<AuditEntry["kind"], { title: string; reveals: string; hides: string }> = {
   exact: {
@@ -117,6 +117,9 @@ export default function RegulatorView({
                       <Badge tone={a.verified ? "ok" : "warn"}>
                         {a.verified ? "Verified on chain" : "Open — no proof exists"}
                       </Badge>
+                      {/* The proof is valid; what it is a proof OF is narrower than the
+                          question reads. Both facts belong in the same row of badges. */}
+                      {a.correction && <Badge tone="no">Corrected</Badge>}
                       <strong style={{ fontSize: "var(--t-md)" }}>{copy.title} disclosure</strong>
                       <span className="note" style={{ display: "inline", marginLeft: "auto" }}>
                         {a.at.replace("T", " ").slice(0, 16)} UTC · proved in {a.proveMs} ms
@@ -135,10 +138,15 @@ export default function RegulatorView({
                       <span style={{ color: "var(--muted)" }}>Question — </span>
                       {a.question}
                     </p>
-                    <p style={{ margin: "0 0 10px" }}>
+                    <p style={{ margin: a.correction ? 0 : "0 0 10px" }}>
                       <span style={{ color: "var(--muted)" }}>Answer — </span>
                       {a.answer}
                     </p>
+                    {a.correction && (
+                      <div style={{ marginBottom: 10 }}>
+                        <Correction>{a.correction}</Correction>
+                      </div>
+                    )}
 
                     <dl className="kv">
                       <dt>Reveals</dt>

@@ -1,6 +1,6 @@
 pragma circom 2.1.6;
 
-// Tukar — Two-sided Range Selective Disclosure circuit
+// Saksi — Two-sided Range Selective Disclosure circuit
 // -----------------------------------------------------------------------------
 // Prove a confidential payment's amount lies within a BAND [lower, upper] WITHOUT
 // revealing the exact amount. The regulator learns only the public band and that the

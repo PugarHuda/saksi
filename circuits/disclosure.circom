@@ -1,8 +1,8 @@
 pragma circom 2.1.6;
 
-// Tukar — Selective Disclosure circuit
+// Saksi — Selective Disclosure circuit
 // -----------------------------------------------------------------------------
-// The compliance wedge of Tukar. A confidential payment in the corridor is
+// A position in the register is
 // represented on-chain only by a commitment:
 //     commitment = Poseidon(amount, pubKey, blinding)
 // The amount and counterparties are hidden. With this circuit the holder can
@@ -43,7 +43,9 @@ template Disclosure() {
     disclosedAmount === amount;
 
     // 3. Range-check the amount to 64 bits (no field-wrap shenanigans; ample for
-    //    any USDC amount in stroops).
+    //    the CVA this register tracks — SAKSIAZEV at 6 decimals, so 2^64-1
+    //    base units is roughly 1.8e13 tokens. Point this circuit at an 18-decimal
+    //    asset and the ceiling becomes 18.4 tokens, which no contract check catches).
     component range = Num2Bits(64);
     range.in <== amount;
 

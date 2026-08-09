@@ -36,10 +36,13 @@ export default function RegisterView({
             {retired !== null && retired >= 0 ? (
               <>
                 <strong>
-                  {positions.length} live · {retired} retired by a shielded transfer
+                  {positions.length} listed live · {retired} leaves this bundle does not list
                 </strong>
                 . The tree only grows: spending a note nullifies it but leaves its leaf in
-                place, so this figure counts every commitment the register has ever held.
+                place, so this figure counts every commitment the register has ever held. The
+                second number is a subtraction, not a read — a leaf the bundle omits has been
+                spent, or belongs to a holder whose ledger is not published here. Only the
+                first number is something this bundle knows.
               </>
             ) : (
               <>
@@ -167,9 +170,12 @@ export default function RegisterView({
               </thead>
               <tbody>
                 {positions.map((p) => {
-                  // No association-set proof is carried by transact(), so a transfer output
-                  // was never "admitted under" any root and has no entry transaction.
-                  const moved = p.origin === "transact";
+                  // No association-set proof is carried by transact(), so NO JoinSplit output
+                  // was "admitted under" a root or has an entry transaction — the sender's
+                  // change ("transact") and the recipient's note ("received") alike. Matching
+                  // the one literal left the received row rendering as a deposit under a root
+                  // that is null in the file, which is what threw inside short().
+                  const moved = (p.origin ?? "deposit") !== "deposit";
                   return (
                     <tr key={p.commitment}>
                       <td className="mono">
@@ -189,8 +195,10 @@ export default function RegisterView({
                       <td className="mono" style={{ fontSize: "var(--t-xs)" }}>
                         {moved ? (
                           <span className="note">not admitted — never entered</span>
-                        ) : (
+                        ) : p.aspRoot ? (
                           short(p.aspRoot, 8, 6)
+                        ) : (
+                          <span className="note">—</span>
                         )}
                       </td>
                       <td className="mono" style={{ fontSize: "var(--t-xs)" }}>
@@ -217,19 +225,21 @@ export default function RegisterView({
           <strong>Where the shielding starts, precisely.</strong> Entry is public by
           construction: a deposit transaction has a visible sender and moves a visible ERC-20
           amount, so the chain already links a deposited commitment to the wallet that opened
-          it. What the register conceals is the book <em>after</em> positions move — a JoinSplit
-          spends notes and creates new ones without publishing an amount or an owner, so who
-          holds what stops tracking who deposited what. We do not publish the entry mapping in
-          this bundle either, but that is courtesy rather than a guarantee, and it would be
-          dishonest to present it as one.
+          it. What a JoinSplit is <em>built</em> to conceal is the book after positions move:
+          the circuit publishes neither an amount nor an owner, so which input became which
+          output is not on the chain. We do not publish the entry mapping in this bundle either,
+          but that is courtesy rather than a guarantee, and it would be dishonest to present it
+          as one.
         </p>
         <p className="note" style={{ marginTop: 12 }}>
-          <strong>And one limit on the notes actually on this chain.</strong> The circuit
-          publishes no amount, but the splitter that produced these particular transfers used a
-          fixed 37/63 ratio. Anyone who knows the input can therefore recompute both outputs, so
-          a reviewer should assume the current figures are readable. That is a property of this
-          demo run, not of the construction — but the construction is not what is deployed here,
-          and the difference is the reviewer&apos;s to check, not ours to gloss.
+          <strong>And that is the construction, not what is deployed here.</strong> The splitter
+          that produced these particular transfers used a fixed 37/63 ratio — a constant in a
+          public repository — and deposits are plaintext, so every note on this chain follows
+          from the deposit log by arithmetic. <strong>Assume the current figures are readable.</strong>{" "}
+          The splitter draws from the CSPRNG now; the notes already inserted do not, and a
+          property is only as good as the operator&apos;s randomness. What still holds for these
+          notes is the linkage, not the amounts: which input became which output is not
+          published. The difference is the reviewer&apos;s to check, not ours to gloss.
         </p>
       </section>
     </div>

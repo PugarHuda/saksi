@@ -83,3 +83,30 @@ export function loadAllNotes() {
 }
 
 export { FIELD };
+
+/** Rebuild the published index from every ledger on disk.
+ *
+ *  The private ledger is one holder's view; the register is all of them. Writing the index
+ *  from `notes.json` alone published four positions while the chain held six, and the
+ *  console then reported a retirement count that was a subtraction against the wrong
+ *  numerator. Nothing here is secret — a commitment, the transaction that created it, and
+ *  how it was created — so the index is derivable and should be derived rather than
+ *  maintained by hand.
+ */
+export function writePublicIndex() {
+  const rows = [];
+  for (const f of ledgerFiles()) {
+    for (const n of loadNotes(path.join(ROOT, f))) {
+      rows.push({
+        commitment: n.commitment,
+        depositTx: n.depositTx ?? null,
+        provedAt: n.provedAt ?? n.receivedAt ?? null,
+        aspRoot: n.aspRoot ?? null,          // a transact carries no association-set proof
+        origin: n.origin ?? "deposit",
+      });
+    }
+  }
+  fs.writeFileSync(path.join(ROOT, "notes.public.json"), JSON.stringify(rows, null, 2) + "
+");
+  return rows.length;
+}

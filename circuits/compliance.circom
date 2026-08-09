@@ -1,8 +1,8 @@
 pragma circom 2.1.6;
 
-// Tukar — Compliance circuit (ASP membership + non-membership)
+// Saksi — Compliance circuit (ASP membership + non-membership)
 // -----------------------------------------------------------------------------
-// Proves, at a corridor edge, that the source of funds is compliant — WITHOUT
+// Proves, at the register's entry, that the depositor is compliant — WITHOUT
 // revealing which member it is:
 //   * MEMBERSHIP: the source key is in the ASP allow-list (Merkle inclusion in
 //     the allow-list tree, root public),
@@ -11,7 +11,9 @@ pragma circom 2.1.6;
 // `bindHash` is a public signal the POOL pins to the deposit commitment (it appears
 // in-circuit only as a squaring so the optimizer can't drop it — it is NOT bound to
 // sourceKey/path inside the circuit). Detach-resistance in the deposit flow comes from
-// two other places: the pool pins sourceKey == field(from) with require_auth(from), and
+// two other places: SaksiPool.deposit pins pubSignals[9] == sourceKeyOf(msg.sender), which is
+// keccak256(abi.encodePacked(msg.sender)) % FIELD — msg.sender being the authenticated
+// caller on an EVM chain, and
 // a separate disclosure/binding proof ties commitment <-> amount.
 //
 // This is the direct on-chain realization of the Privacy Pools whitepaper's
@@ -21,7 +23,7 @@ pragma circom 2.1.6;
 // Private : pathElements[levels], leafIndex
 //
 // sourceKey is PUBLIC: the pool sets it to a field derived from the authenticated
-// depositor (`field(from)`), so the proof shows that *this depositor* is an
+// depositor (sourceKeyOf(msg.sender)), so the proof shows that *this depositor* is an
 // allow-listed source — not merely that some allow-listed source exists. The
 // membership witness (path) is still private.
 // -----------------------------------------------------------------------------
@@ -34,7 +36,7 @@ template Compliance(levels, nDeny) {
     // ---- PUBLIC ----
     signal input aspRoot;            // allow-list Merkle root
     signal input denyList[nDeny];    // publicly known sanctioned keys
-    signal input sourceKey;          // the depositor's source key (= field(from))
+    signal input sourceKey;          // keccak256(depositor) % FIELD, pinned by the pool
     signal input bindHash;           // public signal the POOL pins to the commitment (see header)
 
     // ---- PRIVATE ----

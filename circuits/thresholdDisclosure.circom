@@ -1,6 +1,6 @@
 pragma circom 2.1.6;
 
-// Tukar — Threshold (range) Selective Disclosure circuit
+// Saksi — Threshold (range) Selective Disclosure circuit
 // -----------------------------------------------------------------------------
 // A stronger-privacy sibling of disclosure.circom. Instead of revealing the EXACT
 // amount to a regulator, the holder proves a *predicate* about it — "this payment

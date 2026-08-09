@@ -48,47 +48,55 @@ node -e "const m=require('./measurement.json');console.log(m.walletsEnumerated,'
 
 ---
 
-## Beat 1 — a position changed hands · 80 seconds
+## Beat 1 — the register can mint a position it cannot spend · 80 seconds
 
-**This is the newest thing here and the one that was missing until today.** Lead with it.
+**Newest material, and the beat where being precise is worth more than being impressive.**
 
 > "Until this afternoon every transfer in this register paid its outputs back to a key the
-> sender already held. The mechanism ran, but nothing had ever actually moved between two
-> people. So a second holder generated their own spending key, gave me only the public half,
-> and I paid them a position."
+> sender already held. The mechanism ran, but no position had ever left the sender's control.
+> So I generated a spending key into a separate ledger, kept only the public half on the
+> sending side, and paid a JoinSplit output to it."
 
 ```bash
 cast call $POOL "allCommitments()(uint256[])" --rpc-url $RPC | tr ',' '\n' | wc -l
 ```
 
-> "Ten commitments in the register. Four of them are live positions backing 1,630 units.
-> Three are mine. One is not."
+> "Twelve commitments at the block I read it. Six are live positions backing 2,315 units — and
+> it is still being deposited into, so check it live rather than against my slide."
 
 Show `0x78168fda9282e1d7933c942c102ab2d53b4049a98cda272b0eb7f23167f1291c`, block 52244580.
 
 ```bash
-node -e "const s=require('./notes.json'),h=require('./notes.holder2.json');console.log('my ledger holds',s.length,'positions:',s.map(n=>n.commitment.slice(0,14)).join(' '));console.log('the position I paid out:',h.notes[0].commitment.slice(0,14),'— not in that list, and its key is not mine')"
+node -e "const s=require('./notes.json'),h=require('./notes.holder2.json');console.log('sending ledger:',s.length,'positions',s.map(n=>n.commitment.slice(0,14)).join(' '));console.log('paid out:     ',h.notes[0].commitment.slice(0,14),'— not in that list, and its private key is not there either')"
 ```
 
-> "That output is not in my ledger at all. I do not hold the key, so I cannot spend it, and
-> no proof I can build opens it. Spend authority moved."
+> "That output is not in the sending ledger, and its private key never was. **This register can
+> mint a position the minting process cannot spend.** That is the claim. It is worth having and
+> it is the whole of what I am claiming."
 
-**Then the payoff — and say this precisely:**
+**Then retract the bigger version before anyone else does — this is the strongest thirty
+seconds in the script:**
+
+> "I wanted to tell you a position changed hands between two people. An adversarial review took
+> that apart and it was right. The recipient is a key in a file — no address, no credential.
+> Both transactions were signed by the same wallet. And every disclosure circuit in this build
+> takes amount, public key and blinding, and **no private key** — so anyone holding the note's
+> opening, me included, can still *answer* about that position."
+
+> "**Spend authority separated. Answer authority did not.** A real second holder needs their own
+> credentialed wallet, their own gas, and a disclosure circuit that binds the spending key. That
+> is a recompile and a new ceremony, and it is in the limits. I would rather you heard the exact
+> claim from me than the inflated one from my README."
 
 ```bash
-cast receipt 0x6b243d35d0525e49162e4af76a0bc579eb17c9456c7f3f17dd0a9ee1af446c11 --rpc-url $RPC   # regulator asks,  block 52244758
-cast receipt 0xb7332187dc04833dad65f30b387fbf8ae83aa3e3ae56ec624485ffc49a01cfb7 --rpc-url $RPC   # new owner answers, block 52244768
+cast receipt 0x6b243d35d0525e49162e4af76a0bc579eb17c9456c7f3f17dd0a9ee1af446c11 --rpc-url $RPC   # auditor asks,  block 52244758
+cast receipt 0xb7332187dc04833dad65f30b387fbf8ae83aa3e3ae56ec624485ffc49a01cfb7 --rpc-url $RPC   # answered,      block 52244768
 ```
 
-> "The regulator then posted a question about *that* position — the commitment is right
-> there in the request log — and ten blocks later the new owner answered it from their own
-> ledger, in zero knowledge, without disclosing the figure. A holder who joined this
-> register two hours ago is answerable to the regulator on their own."
-
-> **Say the limit out loud, before anyone asks:** "What this does *not* prove is that I
-> forgot. I built that output, so I know what I sent. That is inherent to any note scheme
-> — the sender always knows the amount they paid — and it is why the property I claim is
-> *spend authority moved*, not *the sender was blinded*."
+> "The auditor did post a question about that separately-keyed position and it was answered
+> under a 600 cap without disclosing the figure. That demonstrates the disclosure path over a
+> note the sender cannot spend. It does not demonstrate a second party, and I am not going to
+> say it does."
 
 ---
 
@@ -125,13 +133,19 @@ closes the request. The contract now pins a hash of the figure and each prover r
 it. There is an exploit test in the repo that fails against the old contract and passes
 against the fix.
 
-**If they read down to the last aggregate row, get there first.** Block 52245878 answered
-"total exposure across all **3** registered positions" while the register held **four** live
-positions — one of them the holder's from Beat 1, which this ledger cannot open. That answer
-is a subset reported as a total, it is permanently on-chain, and it is the exact
-cherry-picking this design exists to refuse. `ops/audit.mjs` now reads the retirement count
-from the chain rather than inferring it, and refuses to answer at all when a live position
-belongs to a holder who has not contributed their opening. **The honest ceiling of the
+**Get to the last aggregate row before they do.** Block 52245878 answered "total exposure
+across all **3** registered positions" while four were live — the fourth being the
+separately-keyed one from Beat 1, which this ledger cannot open. The enumerator counted
+retirements by what the ledger could open, which is circular, so it filed a live position as
+retired. The answer is true of the three it names and is **not** a statement about the register.
+
+> "I cannot retract it — it is on-chain and it stays there. So `audit-log.json` carries the
+> correction attached to that row rather than me quietly re-running it. A register that
+> publishes its own wrong answer with the correction next to it is worth more than one that
+> only ever shows you the clean rows."
+
+`ops/audit.mjs` now counts retirements from the chain and refuses outright when a live position
+belongs to a key that has not contributed an opening. **The honest ceiling of the
 concentration-cap claim is that it is single-prover.**
 
 ---
@@ -225,9 +239,9 @@ and a judge who reached for `eth_estimateGas` would have found that out before w
 cd contracts && forge test
 ```
 
-> "A hundred and twenty-eight tests, including the exploit proofs from three adversarial
-> reviews of this codebase — kept as regression tests, and twelve of them assert limitations
-> that are still open."
+> "A hundred and thirty-one tests, including the exploit proofs from three adversarial reviews
+> of this codebase — kept as regression tests, and twelve of them assert limitations that are
+> still open."
 
 > "Saksi. Every position witnessed. Disclosure only when asked."
 
@@ -252,10 +266,12 @@ cd contracts && forge test
 - **"Why is the association set 524 people?"** — the sandbox is shared across teams, so it
   holds other participants' credentials. That is the set being faithful to the registry.
 - **"Does it speak ERC-3643?"** — the pool answers `isVerified(address)` and
-  `canTransfer(from,to,amount)` in T-REX's shape, composing all three entry controls, so an
-  existing integration can query this register without knowing anything about it. **Written
-  and tested, not deployed** — redeploying would reset the two permanently-open audit
-  requests, whose entire value is that they have been open since a specific block.
+  `canTransfer(from,to,amount)` in T-REX's shape, composing all three entry controls, plus
+  `canTransferWithReason` returning an ERC-1066 status byte so an integrator can tell *which*
+  control refused — credential, anchored set, or sanctions list — instead of getting one
+  boolean for three situations that need three different actions. **Written and tested, not
+  deployed** — redeploying would reset the two permanently-open audit requests, whose entire
+  value is that they have been open since a specific block.
 - **"What is not finished?"** — the note root is owner-published rather than advanced by the
   `merkleUpdate` proof; the exit is gated operationally; the deny list is a fixed 8 slots; the
   aggregate is single-prover. All four are in the summary.

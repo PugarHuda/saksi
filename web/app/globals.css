@@ -311,6 +311,14 @@ input[type="text"]::placeholder { color: var(--muted); }
   color: var(--foreground);
   font-size: var(--t-sm);
 }
+/* An open request is evidence; a correction is a mistake we cannot take back. --refused is
+   the one place that reading is right, so it does not share the accent with the callouts. */
+.callout.correction {
+  background: var(--refused-soft);
+  border-left-color: var(--refused);
+  margin: 10px 0 0;
+}
+.callout.correction strong { color: var(--refused); }
 
 /* `clip` is a paint-time effect, so long visually-hidden text still counted towards the
    document's scrollable width. clip-path removes it from layout overflow as well. */

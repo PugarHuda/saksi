@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { RPC, SELECTORS, blockOf, call, padUint, short, units } from "@/lib/chain";
 import type { Asp, AuditEntry, Deployment, Position } from "@/lib/types";
 import type { useLive } from "@/lib/useLive";
-import { Addr, Badge, Copyable, Empty, ErrorBox, Skeleton, Tx } from "./bits";
+import { Addr, Badge, Copyable, Correction, Empty, ErrorBox, Skeleton, Tx } from "./bits";
 
 /** The submission's strongest claim is a negative one: two questions were posted on chain and
  *  can never be answered. That claim is only worth anything if a reader can check it without
@@ -131,6 +131,7 @@ export default function EvidenceView({
                 <p className="note" style={{ margin: "0 0 12px" }}>
                   {r.answer}
                 </p>
+                {r.correction && <Correction>{r.correction}</Correction>}
                 <dl className="kv">
                   <dt>Claim bound on chain</dt>
                   <dd className="mono" style={{ fontSize: "var(--t-xs)" }}>
@@ -207,6 +208,9 @@ export default function EvidenceView({
                         <span className="note" style={{ display: "block" }}>
                           {r.answer}
                         </span>
+                        {/* A closed request cannot be re-run, so the row and its correction
+                            are one unit — the ledger must never show the answer alone. */}
+                        {r.correction && <Correction>{r.correction}</Correction>}
                         <span className="note" style={{ display: "block", marginTop: 6 }}>
                           <Tx hash={r.requestTx} label="request tx" /> →{" "}
                           <Tx hash={r.verifyTx} label="verification tx" />
