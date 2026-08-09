@@ -1720,7 +1720,7 @@ contract Audit5Test is Test {
     ///
     /// A fix is two lines — `if (_denied(recipient)) revert`, and the same for a paid
     /// relayer — costing eight SLOADs on a path that already makes a cross-contract call.
-    function test_F11_FINDING_TheDenyListIsNotEnforcedOnTheExit() public {
+    function test_F11_TheDenyListIsEnforcedOnTheExit() public {
         _deposit(holder, bytes32(uint256(9200)), 100e6);
 
         // payee holds a live Cleanverse credential AND sits on this register's deny list.
@@ -1735,14 +1735,23 @@ contract Audit5Test is Test {
         assertEq(code, pool.STATUS_INVALID_RECEIVER());
         assertEq(why, bytes32("RECIPIENT_SANCTIONED"));
 
-        // ...and then pays them anyway, along with a sanctioned relayer.
+        // ...and the payout is refused too now, so the view and the transaction agree.
+        // THE DEPLOYED POOL PAYS THIS OUT — SUMMARY.md lists the guard as undeployed. The
+        // honest statement about the live register is that its exit is screened by
+        // Cleanverse's blacklist and not by ours.
         uint[7] memory s = _xfer(10e6, payee, relay, 1e6, 30);
+        vm.expectRevert(SaksiPool.DeniedParty.selector);
         pool.transact(pA, pB, pC, s, payee, relay, 1e6);
+        assertEq(asset.balanceOf(payee), 0, "nothing reached the sanctioned recipient");
 
-        assertEq(asset.balanceOf(payee), 9e6,
-            "FINDING: a sanctioned recipient is paid despite canTransfer refusing it");
-        assertEq(asset.balanceOf(relay), 1e6,
-            "FINDING: and so is a sanctioned relayer");
+        // With the list cleared the same withdrawal goes through, so the guard is refusing
+        // the sanction rather than the shape of the transaction.
+        uint256[8] memory empty;
+        pool.setDenyList(empty);
+        uint[7] memory s2 = _xfer(10e6, payee, relay, 1e6, 31);
+        pool.transact(pA, pB, pC, s2, payee, relay, 1e6);
+        assertEq(asset.balanceOf(payee), 9e6);
+        assertEq(asset.balanceOf(relay), 1e6);
     }
 
     /// FINDING F12 (LOW). `canTransferWithReason` tests the credential before the sanction
@@ -1751,7 +1760,7 @@ contract Audit5Test is Test {
     /// when your A-Pass is sorted", the other says "do not deal with this party" — and
     /// masking the second behind the first is the wrong way round for a sanctions control.
     /// A fix tests _denied first on each edge; the code byte is unchanged either way.
-    function test_F12_FINDING_SanctionedIsMaskedByNotCredentialed() public {
+    function test_F12_SanctionIsReportedAheadOfMissingCredential() public {
         uint256[8] memory list;
         list[0] = pool.sourceKeyOf(stranger);
         pool.setDenyList(list);
@@ -1759,8 +1768,9 @@ contract Audit5Test is Test {
 
         (bytes1 code, bytes32 why) = pool.canTransferWithReason(stranger, payee, 1);
         assertEq(code, pool.STATUS_INVALID_SENDER());
-        assertEq(why, bytes32("SENDER_NOT_CREDENTIALED"),
-            "FINDING: the sanction is invisible behind the missing credential");
+        assertEq(why, bytes32("SENDER_SANCTIONED"),
+            "the sanction is reported, not the credential that also happens to be missing");
+
 
         // The sanction only surfaces once the credential is granted, which is precisely
         // when an integrator has already been told the problem was the credential.

@@ -251,6 +251,10 @@ contract SaksiPool is Ownable {
     error UnknownRoot();
     error UnknownNoteRoot();
     error DenyListMismatch();
+    /// A party to a withdrawal is on this register's own deny list. Distinct from
+    /// DenyListMismatch, which is about a proof disagreeing with the list rather than about
+    /// a wallet being on it.
+    error DeniedParty();
     error SourceKeyMismatch();
     error CommitmentNotBound();
     error CommitmentExists();
@@ -260,6 +264,9 @@ contract SaksiPool is Ownable {
     error ZeroAmount();
     error NoSuchAudit();
     error AuditClosed();
+    /// The question at this context is already registered and still open. Rewriting it in
+    /// place would let the asker change what was asked after the fact.
+    error AuditAlreadyRequested();
     error UnknownCommitment();
     error ExtDataMismatch();
     error DepositsUseDepositPath();
@@ -348,10 +355,17 @@ contract SaksiPool is Ownable {
         returns (bytes1 code, bytes32 reason)
     {
         if (paused) return (STATUS_HALTED, "REGISTER_PAUSED");
-        if (!_eligible(from)) return (STATUS_INVALID_SENDER, "SENDER_NOT_CREDENTIALED");
+        // Sanction before credential, on each edge. The other order tested the credential
+        // first, so a wallet that was BOTH uncredentialed and sanctioned reported only
+        // "not credentialed" — and the two demand opposite handling. One says come back
+        // when your A-Pass is sorted; the other says do not deal with this party at all.
+        // Masking the second behind the first is the wrong way round for a sanctions
+        // control, and it is the reading an integrator would act on.
+        // NOT DEPLOYED. See SUMMARY.md.
         if (_denied(from)) return (STATUS_INVALID_SENDER, "SENDER_SANCTIONED");
-        if (!_eligible(to)) return (STATUS_INVALID_RECEIVER, "RECIPIENT_NOT_CREDENTIALED");
+        if (!_eligible(from)) return (STATUS_INVALID_SENDER, "SENDER_NOT_CREDENTIALED");
         if (_denied(to)) return (STATUS_INVALID_RECEIVER, "RECIPIENT_SANCTIONED");
+        if (!_eligible(to)) return (STATUS_INVALID_RECEIVER, "RECIPIENT_NOT_CREDENTIALED");
         if (amount > asset.balanceOf(address(this))) {
             return (STATUS_INSUFFICIENT_BALANCE, "EXCEEDS_BACKING");
         }
@@ -667,6 +681,23 @@ contract SaksiPool is Ownable {
             _requireEligible(recipient);
             if (fee != 0) _requireEligible(relayer);
 
+            // And on OUR deny list, which this path did not consult. Entry checks it;
+            // the exit did not, so a wallet named in setDenyList could still be paid out
+            // — with `canTransferWithReason` answering (0x57, "RECIPIENT_SANCTIONED")
+            // about the very transfer that was about to succeed. Unlike entry there is no
+            // circuit behind this: transfer.circom's public signals are the root, the
+            // amount, the ext-data hash and the two nullifier/commitment pairs. No source
+            // key, no deny signals, nothing to fall back on.
+            //
+            // Cleanverse's own isBlackList and countryBitmap still screen both edges
+            // through _requireEligible, so a sanctioned wallet is not simply waved out —
+            // but it is screened by THEIR list, not by ours, and the two are set by
+            // different parties for different reasons.
+            //
+            // NOT DEPLOYED: the live pool does not have these two lines. See SUMMARY.md.
+            if (_denied(recipient)) revert DeniedParty();
+            if (fee != 0 && _denied(relayer)) revert DeniedParty();
+
             require(asset.transfer(recipient, withdrawn - fee), "transfer failed");
             if (fee != 0) require(asset.transfer(relayer, fee), "fee transfer failed");
         }
@@ -715,11 +746,38 @@ contract SaksiPool is Ownable {
         // Answers are permanent, so re-asking on a spent context would create a request
         // that can never be satisfied. Fail here rather than at answering time.
         if (auditAnswered[contextHash] != 0) revert AuditClosed();
+        // And an OPEN request is not re-askable either, which this checked for the answered
+        // case and not for this one. Without it the auditor can rewrite a live question's
+        // subject, kind and claim in place — measured at 81,572 gas to repoint the open
+        // 100–400 range at a leaf that sits inside the bracket, and 103,707 to turn the open
+        // aggregate into a threshold over a leaf that satisfies it. Two ordinary proofs then
+        // close both. That is roughly a quarter of a MON to make this register's two
+        // permanently-unanswered requests read as answered, by the one party whose
+        // disinterest the whole artefact assumes — and setAuditor is 42,613 gas and
+        // unilateral for the issuer, so it is not even a collusion.
+        //
+        // Detectable, at least: every call emits AuditRequested, so a second event on the
+        // same context is visible to anyone reading the log, and the honest claim about the
+        // deployed pool is that a question cannot be changed SILENTLY rather than that it
+        // cannot be changed. This line is what makes the stronger claim true.
+        //
+        // NOT DEPLOYED. See SUMMARY.md.
+        if (auditRequested[contextHash]) revert AuditAlreadyRequested();
         if (subject >= FIELD) revert WrongSubject();
         // An aggregate is named by its context hash, not by one commitment; a non-zero
         // subject here would be unanswerable.
         if (kind == KIND_AGGREGATE && subject != 0) revert WrongSubject();
         if (kind == KIND_EXACT && claim != bytes32(0)) revert WrongClaim();
+        // ...and its converse, which was missing. claimHash never returns 0 for a numeric
+        // kind, so a zero claim on one is unanswerable from the moment it is registered —
+        // no threshold, no range, no aggregate can ever match it. That mattered less while
+        // an open request could be rewritten; with the guard above it is permanent, so the
+        // one shape that is provably a mistake is refused at the door instead.
+        //
+        // This does not make a request answerable in general: the claim is an opaque hash
+        // and the contract cannot know whether the auditor hashed a figure they meant.
+        // NOT DEPLOYED. See SUMMARY.md.
+        if (kind != KIND_EXACT && claim == bytes32(0)) revert WrongClaim();
 
         auditRequested[contextHash] = true;
         auditSubject[contextHash] = subject;

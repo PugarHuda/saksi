@@ -171,6 +171,28 @@ by rebuild, and an auditor who can compel a bounded answer and get a *recorded n
 - **The register is one operator's machine.** Every ledger, including the separately-keyed one,
   lives in the same working directory, which is what makes the single-prover aggregate possible at
   all and why the honest claim above is about key separation rather than custody.
+- **Four more source fixes that the live pool does not have.** Found by an invariant and
+  fuzzing pass and by an incentive review, all fixed in `SaksiPool.sol`, all tested, none
+  deployed — for the same reason as the bullet below: a redeploy resets two audit requests whose
+  entire value is that they have been open since a named block.
+    - `transact` never consulted **our own deny list on the exit**. It gates both edges through
+      Cleanverse's Validator and never calls `_denied`, so a wallet on `setDenyList` could be
+      paid out — while `canTransferWithReason` answered `RECIPIENT_SANCTIONED` about that same
+      transfer. Unlike entry there is no circuit behind it: `transfer.circom` has no source key
+      and no deny signals. **What screens the live exit is Cleanverse's blacklist, not ours.**
+    - `requestAudit` guarded the answered case but not the **open** one, so the auditor could
+      rewrite a live question's subject, kind and claim in place: 81,572 gas to repoint the open
+      100–400 range at a leaf inside the bracket, 103,707 to turn the open aggregate into a
+      satisfiable threshold, then two ordinary proofs — about a quarter of a MON to make both
+      "permanently unanswered" requests read as answered. `setAuditor` is 42,613 gas and
+      unilateral for the issuer, so it is not even a collusion. **What is true of the live pool
+      is the weaker claim: every call emits `AuditRequested`, so a rewrite is visible in the log
+      and cannot happen silently.**
+    - A **zero claim on a numeric kind** was accepted, and `claimHash` never returns zero for
+      one — the request was unanswerable from registration. Harmless while an open request could
+      be rewritten; permanent once it cannot.
+    - `canTransferWithReason` tested the credential **before** the sanction, so a wallet that
+      was both reported only the missing credential. The two demand opposite handling.
 - **Answer authority does not move with a position.** Every disclosure circuit takes `(amount,
   pubKey, blinding)` and no private key, so anyone holding a note's opening — including whoever
   built the output — can prove things about it.
@@ -183,9 +205,22 @@ by rebuild, and an auditor who can compel a bounded answer and get a *recorded n
   so an indexer built from this repo matches **zero** events. Index on `0x9579a4d2…`; recompute
   either with `cast keccak`. On that shape a range answer's log does not name its subject, both
   value slots going to the bounds — which is why the field exists.
-- **Which commitments are live is public**, and an earlier version of this page implied otherwise:
-  `notes.public.json` publishes them, so set-differencing against `allCommitments()` names the
-  spent ones. What is hidden is which input became which output, and what any is worth.
+- **Which commitments are live was public, and it cost us the transfer graph.**
+  `notes.public.json` was written from the operator's ledgers, which drop a position when it is
+  spent — so the published file WAS the live set. Nothing else publishes that: a nullifier is
+  `Poseidon(commitment, leafIndex, privKey)`, so without the key nobody can tie one to the leaf
+  it retires. An adversarial review working only from the public repo, the chain and the live
+  site took the spent set by subtraction, which forces the inputs of every 2-in/2-out JoinSplit
+  by elimination, which turns conservation into a solvable system against the plaintext deposit
+  amounts — and recovered **270.1 CVA on leaf 4, which no audit ever disclosed**. The index is
+  now built from `CommitmentInserted` by `ops/publish-index.mjs` and lists all twelve leaves
+  with no liveness field. **The already-recovered amounts stay recovered**; this closes the
+  method, not its past results.
+- **Entry is public, and four of the six live positions have never moved.** `Deposited` carries
+  the plaintext amount and the depositor, so a position that has not been through a JoinSplit is
+  public in full — amount and holder both. That is the deployed design and not a defect, but it
+  means "holders are private" is a claim about the register's MIDDLE, not about its face. What a
+  commitment protects starts the moment the position moves.
 - **This register's amounts are derivable, and that is our bug.** `ops/transfer.mjs` split each
   JoinSplit 37/63 — a constant in a public repo — and deposits are plaintext, so every note
   follows from the deposit log: 730 × 0.37 = 270.1. The splitter now draws from the CSPRNG; the

@@ -282,45 +282,61 @@ contract Audit3Test is Test {
         assertEq(pool.auditClaim(8301), cl);
     }
 
-    /// F1. An OPEN request is mutable: requestAudit has no `auditRequested` guard, so the
-    /// auditor can rewrite subject, kind and claim under a prover who is mid-flight. The
-    /// holder's answer then reverts WrongClaim through no fault of theirs, and the only
-    /// record of the original question is the event log.
-    /// (The same mutability is the ONLY repair path for a mis-registered claim — see F2.)
-    function test_F1_OpenAuditRequestIsSilentlyRewritable() public {
+    /// F1, now closed in source. An OPEN request used to be mutable: requestAudit guarded
+    /// the ANSWERED case and not this one, so the auditor could rewrite subject, kind and
+    /// claim under a prover who was mid-flight — the holder's answer then reverted WrongClaim
+    /// through no fault of theirs, and the only record of the original question was the event
+    /// log. Priced on the deployed pool at 81,572 gas to repoint the open 100-400 range at a
+    /// leaf inside the bracket, 103,707 to turn the open aggregate into a satisfiable
+    /// threshold; two ordinary proofs then close both. About a quarter of a MON to make this
+    /// register's two permanently-unanswered requests read as answered — by the one party
+    /// whose disinterest the artefact assumes, and setAuditor is 42,613 gas and unilateral for
+    /// the issuer, so not even a collusion.
+    ///
+    /// THE DEPLOYED POOL DOES NOT HAVE THIS GUARD (SUMMARY.md lists it). What is true there is
+    /// the weaker claim: every call emits AuditRequested, so a rewrite is visible to anyone
+    /// reading the log and cannot happen SILENTLY.
+    ///
+    /// Closing it costs the repair path F2 depended on, which is why F2's shape is now
+    /// refused at registration rather than left to be fixed later.
+    function test_F1_OpenAuditRequestCannotBeRewritten() public {
         _deposit(holder, bytes32(uint256(240)), 50e6);
         uint8 THR = pool.KIND_THRESHOLD();
         pool.requestAudit(8401, 240, THR, _cl(THR, 1_000e6), "at most 1,000?");
 
-        // auditor front-runs the answer and moves the goalposts
+        // the auditor tries to move the goalposts under a prover mid-flight
+        vm.expectRevert(SaksiPool.AuditAlreadyRequested.selector);
         pool.requestAudit(8401, 240, THR, _cl(THR, 999e6), "at most 999?");
-        assertEq(pool.auditClaim(8401), _cl(THR, 999e6), "FINDING: the open question was rewritten");
 
+        // and the question it was registered with still stands
+        assertEq(pool.auditClaim(8401), _cl(THR, 1_000e6), "the original question survives");
         vm.prank(holder);
-        vm.expectRevert(SaksiPool.WrongClaim.selector);
         pool.proveThreshold(pA, pB, pC, [uint256(240), uint256(1_000e6), uint256(8401)]);
+        assertEq(pool.auditAnswered(8401), THR);
     }
 
     /// F2. requestAudit takes an OPAQUE claim and cannot check it is a hash any prover can
     /// reproduce. bytes32(0) is accepted on every non-exact kind — claimHash never returns
     /// 0 for those — so the request is unanswerable from the moment it is registered. The
     /// contract validates EXACT => claim == 0 but not its converse.
-    function test_F2_ZeroClaimOnNumericKindIsUnanswerable() public {
+    function test_F2_ZeroClaimOnNumericKindIsRefused() public {
         _deposit(holder, bytes32(uint256(250)), 50e6);
         uint8 THR = pool.KIND_THRESHOLD();
 
+        // Refused at the door now. claimHash never returns 0 for a numeric kind, so this
+        // request could never have been satisfied by any figure — and once an open request
+        // stopped being rewritable (F1) that would have been permanent rather than merely
+        // embarrassing. NOT DEPLOYED: the live pool still accepts it.
+        vm.expectRevert(SaksiPool.WrongClaim.selector);
         pool.requestAudit(8501, 250, THR, bytes32(0), "at most 1,000?");
-        assertEq(pool.auditClaim(8501), bytes32(0), "FINDING: a claim no prover can match was accepted");
+        assertFalse(pool.auditRequested(8501), "no unanswerable request was registered");
 
-        // every possible threshold fails, because claimHash(THRESHOLD, x) is never 0
-        vm.startPrank(holder);
-        vm.expectRevert(SaksiPool.WrongClaim.selector);
+        // The check is one-directional on purpose: a WELL-FORMED claim still registers, and
+        // the contract cannot tell whether the auditor hashed the figure they meant.
+        pool.requestAudit(8501, 250, THR, _cl(THR, 1_000e6), "at most 1,000?");
+        vm.prank(holder);
         pool.proveThreshold(pA, pB, pC, [uint256(250), uint256(1_000e6), uint256(8501)]);
-        vm.expectRevert(SaksiPool.WrongClaim.selector);
-        pool.proveThreshold(pA, pB, pC, [uint256(250), uint256(0), uint256(8501)]);
-        vm.expectRevert(SaksiPool.WrongClaim.selector);
-        pool.proveThreshold(pA, pB, pC, [uint256(250), U64_MAX, uint256(8501)]);
-        vm.stopPrank();
+        assertEq(pool.auditAnswered(8501), THR);
     }
 
     /// F3. deposit accepts commitment 0 — the value the contract reserves as "no subject /

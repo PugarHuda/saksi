@@ -348,9 +348,25 @@ builder, the disclosure flow, the deployment, and the consoles.
   Index on the deployed topic0; recompute either with `cast keccak "<signature>"`. On the
   deployed shape the range path spends both value slots on its bounds, so a range answer's log
   never names the position it was about — which is exactly why the field was added.
-- **Which commitments are live is public.** `notes.public.json` publishes them, so
-  set-differencing against `allCommitments()` names the spent ones. What is hidden is which
-  input became which output, and what any of them is worth.
+- **Which commitments are live was public, and it cost us the transfer graph.**
+  `notes.public.json` was written from the operator's ledgers, and a ledger drops a position
+  when it is spent — so the published file was exactly the live set. Nothing else publishes
+  that: a nullifier is `Poseidon(commitment, leafIndex, privKey)`, so without the key nobody
+  can tie one to the leaf it retires. An adversarial review took the spent set by subtraction,
+  which forces every 2-in JoinSplit's inputs by elimination, which makes conservation solvable
+  against the plaintext deposit amounts — and recovered **270.1 CVA on leaf 4, an amount no
+  audit ever disclosed**, from the public repo and the chain alone. `ops/publish-index.mjs`
+  now builds the index from `CommitmentInserted` and lists all twelve leaves with no liveness
+  field. That closes the method; the amounts already recovered stay recovered.
+- **Entry is public, and four of the six live positions have never moved.** `Deposited` carries
+  the plaintext amount and the depositor, so a position that has not been through a JoinSplit is
+  public in full. That is the deployed design, not a defect — but it means the privacy claim is
+  about the register's middle, not its face.
+- **Four contract fixes are in the source and not on the live pool** — the deny list on the
+  exit, the guard against rewriting an OPEN audit request, the refusal of a zero claim on a
+  numeric kind, and reporting a sanction ahead of a missing credential. All tested. See
+  `SUMMARY.md` for what each one means for the deployed register; the sharpest is that the
+  live exit is screened by Cleanverse's blacklist and not by ours.
 - **This register's amounts are derivable, and that is our bug.** `ops/transfer.mjs` split
   each JoinSplit 37/63 — a constant in a public repository — and deposits are plaintext, so
   every note follows from the deposit log: 730 × 0.37 = 270.1. The splitter now draws from the
