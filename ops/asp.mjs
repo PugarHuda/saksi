@@ -104,7 +104,12 @@ const admits = (rec) => {
   // Null is "never set", which the registry treats as live; 1 is active; anything else is
   // frozen or worse.
   if (rec.status != null && Number(rec.status) !== 1) return false;
-  if (Number(rec.tier) <= RULE.minTier) return false;
+  // Inclusive, because that is what Cleanverse means. Their docs read "allowed if the
+  // user's A-Pass tier is greater than this value", but the rule is registered as a
+  // MINIMUM and both artefacts print `min_tier 30` — so a tier-30 credential that gate one
+  // admits must not be one gate two has no witness for. No member is tier 30 today, which
+  // is exactly why this could sit wrong without anyone noticing.
+  if (Number(rec.tier) < RULE.minTier) return false;
   if (RULE.countries.length) {
     const tags = (rec.countries ?? []).map((c) => c.toUpperCase());
     if (!tags.some((c) => RULE.countries.includes(c))) return false;
@@ -237,7 +242,7 @@ if (isCli && cmd === "build") {
   writeDeployment({ aspRoot: out.root, aspBuiltAt: out.builtAt, aspAdmitted: out.admitted });
 
   console.log(`population (active A-Pass on ${CHAIN})   ${population.length}`);
-  console.log(`admitted by rule (tier > ${RULE.minTier})            ${admitted.length}`);
+  console.log(`admitted by rule (tier >= ${RULE.minTier})           ${admitted.length}`);
   if (excluded.size) console.log(`excluded this round                     ${[...excluded].join(", ")}`);
   console.log(`root                                    ${out.root}`);
   const dep = readDeployment();

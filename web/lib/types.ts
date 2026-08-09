@@ -15,6 +15,7 @@ export type Deployment = {
   aspBuiltAt?: string;
   validatorRegisterTx?: string;
   verifiers?: Record<string, string>;
+  auditor?: string;
   explorer?: string;
 };
 
@@ -62,6 +63,10 @@ export type AuditEntry = {
   answer: string;
   requestTx?: string;
   verifyTx?: string;
+  // Optional: the ops scripts may record these. When they are absent the console derives
+  // them from the transaction receipts, so the evidence screen never waits on the file.
+  requestBlock?: number;
+  verifyBlock?: number;
   verified: boolean;
   proveMs: number;
   at: string;

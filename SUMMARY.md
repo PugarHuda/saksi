@@ -48,8 +48,9 @@ posts a question on-chain and waits for a proof that answers exactly it.
    msg.sender)` on it, live, inside the transaction that moves value. An unregistered pool
    reverts rather than returning false, so the register fails closed.
 2. **The asset is a real CVA.** `SAKSIAZEV` was issued through `atoken/launch` carrying a
-   `min_tier 30` rule from issuance. `activeRules()` on our pool and `getRulesV2()` on
-   theirs return the identical `(0x0000, 0x0000, 30, 0, false, 0)`.
+   `min_tier 30` rule from issuance. `activeRules()` on our pool forwards to
+   `getRulesV2()` on theirs and returns `(0x0000, 0x0000, 30, 0, false, 0)` — the rule is
+   theirs, read live, not a copy kept in step here.
 3. **The association set is derived from live CVI.** 524 members admitted from a population of 602 at
    10:07 UTC — the census an hour earlier enumerated 562, which is why the two figures differ — rebuilt from A-Pass state on every run, root anchored on-chain. `ops/gate-gap.mjs`
    asks the validator about **every one of the 524** — all are admitted by Cleanverse too,

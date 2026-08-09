@@ -199,7 +199,7 @@ node ops/transfer.mjs --as issuer          # prove, publish the note root, spend
 This is the operation the whole commitment scheme exists for, and it had never been executed
 on-chain until this build: `noteRoot()` was `0`, which made `transact()` unreachable rather
 than merely undemonstrated. The register now holds eight commitments, four of them live
-positions — and which four is not public.
+positions.
 
 **5. And value leaves it under the same rules.** A second JoinSplit
 ([`0x08b6801b…`](https://testnet.monadexplorer.com/tx/0x08b6801b1cbcaa681f2a81d77628e4c88dcec9bf70793492663fa605422d0e3a),

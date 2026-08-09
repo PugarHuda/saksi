@@ -63,6 +63,33 @@ export function Empty({ children }: { children: React.ReactNode }) {
   return <div className="empty">{children}</div>;
 }
 
+/** A command a reader is meant to run, not read. The text stays selectable — the button is
+ *  the shortcut, not the only way to get the line out. */
+export function Copyable({ cmd }: { cmd: string }) {
+  const [done, setDone] = useState(false);
+  return (
+    <span className="copyable">
+      <code className="mono">{cmd}</code>
+      <button
+        type="button"
+        className="btn ghost copy"
+        onClick={() => {
+          navigator.clipboard?.writeText(cmd).then(
+            () => {
+              setDone(true);
+              setTimeout(() => setDone(false), 1600);
+            },
+            () => setDone(false),
+          );
+        }}
+      >
+        {done ? "Copied" : "Copy"}
+        <span className="sr-only"> command: {cmd}</span>
+      </button>
+    </span>
+  );
+}
+
 export function ErrorBox({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="error" role="alert">

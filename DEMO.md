@@ -129,7 +129,7 @@ Show the transfer transaction `0x30a74be85a99b68c4bd0a40a1beb7575b0b06686ed61099
 > regulator posted a question, and the chain records that the question came first."
 
 > "The register still backs every unit it held and the total is unchanged by this. Four of
-> its commitments are live positions, and which four is not public."
+> its commitments are live positions."
 
 ---
 

@@ -70,5 +70,17 @@
     "verified": false,
     "proveMs": 91,
     "at": "2026-08-09T10:23:32.010Z"
+  },
+  {
+    "kind": "threshold",
+    "question": "is this position at most 600 SAKSIAZEV?",
+    "circuit": "thresholdDisclosure",
+    "contextHash": "11992816547940957941462159611436375381387009486915845928999542522128103545058",
+    "answer": "yes — position <= 600, figure not disclosed",
+    "requestTx": "0x6b243d35d0525e49162e4af76a0bc579eb17c9456c7f3f17dd0a9ee1af446c11",
+    "verifyTx": "0xb7332187dc04833dad65f30b387fbf8ae83aa3e3ae56ec624485ffc49a01cfb7",
+    "verified": true,
+    "proveMs": 777,
+    "at": "2026-08-09T13:15:19.840Z"
   }
 ]

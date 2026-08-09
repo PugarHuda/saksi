@@ -109,6 +109,17 @@ const argOf = (flag, dflt = null) => {
 const toUnits = (v) => BigInt(Math.round(Number(v) * 1e6));
 
 const withdrawUnits = argOf("--withdraw") ? toUnits(argOf("--withdraw")) : 0n;
+// A real recipient. outPubkey is a PRIVATE input to the circuit, so paying someone else
+// needs no recompile, no new ceremony and no redeploy — and until it was wired, every
+// output of every transfer here was keyed to the sender's own fresh key, which means
+// nothing had ever changed hands. A register whose positions cannot move to another
+// person is a vault with a disclosure API.
+const toPubKey = argOf("--to-pubkey") ? BigInt(argOf("--to-pubkey")) : null;
+const toLabel = argOf("--to-label");
+if (toPubKey && !toLabel) {
+  console.error("--to-pubkey needs --to-label: the recipient's note has to be written somewhere");
+  process.exit(1);
+}
 const recipient = argOf("--to", "0x0000000000000000000000000000000000000000");
 const relayer = argOf("--relayer", "0x0000000000000000000000000000000000000000");
 const fee = argOf("--fee") ? toUnits(argOf("--fee")) : 0n;
@@ -155,11 +166,17 @@ const rand = () => {
     (s, b) => s + b.toString(16).padStart(2, "0"), "")); } while (v >= FIELD || v === 0n);
   return v;
 };
+// Output 0 goes to the recipient when one is named, output 1 is always the sender's change.
+// The recipient's slot carries THEIR public key and no private key at all — this process
+// cannot spend what it is about to send, which is the whole difference between a transfer
+// and a re-labelling.
 const outs = [
-  { amount: outA, privKey: rand(), blinding: rand() },
+  toPubKey
+    ? { amount: outA, pubKey: toPubKey, blinding: rand(), privKey: null, to: toLabel }
+    : { amount: outA, privKey: rand(), blinding: rand() },
   { amount: outB, privKey: rand(), blinding: rand() },
 ].map((o) => {
-  const pubKey = h1(o.privKey);
+  const pubKey = o.pubKey ?? h1(o.privKey);
   return { ...o, pubKey, commitment: h3(o.amount, pubKey, o.blinding) };
 });
 
@@ -246,7 +263,10 @@ fs.writeFileSync(
     outputs: outs.map((o) => ({
       amount: o.amount.toString(),
       commitment: hexOf(o.commitment),
-      privKey: o.privKey.toString(),
+      // A note paid to someone else has no key here, and that absence is the point of the
+      // whole operation — this process cannot spend what it is sending.
+      privKey: o.privKey ? o.privKey.toString() : null,
+      to: o.to ?? null,
       blinding: o.blinding.toString(),
     })),
     noteRoot: tree.root.toString(),
@@ -268,6 +288,28 @@ const txHash = /transactionHash\s+(0x[0-9a-f]+)/.exec(out)?.[1];
 // aggregate proof enumerates what the pool actually holds.
 const kept = notes.filter((n) => !ins.some((i) => i.commitment === n.commitment));
 for (const o of outs) {
+  // A note whose key this process does not hold is not ours to record as a position. It is
+  // written to the recipient's own ledger, without a privKey, because there isn't one here.
+  if (o.to) {
+    const rf = path.join(ROOT, `notes.${o.to}.json`);
+    const led = fs.existsSync(rf) ? JSON.parse(fs.readFileSync(rf, "utf8")) : { label: o.to, notes: [] };
+    led.notes.push({
+      amount: o.amount.toString(),
+      amountDisplay: Number(o.amount) / 1e6,
+      commitment: hexOf(o.commitment),
+      blinding: o.blinding.toString(),
+      pubKey: o.pubKey.toString(),
+      noteRoot: tree.root.toString(),
+      origin: "received",
+      from: spender.address,
+      receivedAt: new Date().toISOString(),
+      depositTx: txHash,
+    });
+    fs.writeFileSync(rf, JSON.stringify(led, null, 2) + "\n");
+    console.log(`\n${o.to} received a position, and only ${o.to} can spend it — this`);
+    console.log(`process never held the key. Written to notes.${o.to}.json`);
+    continue;
+  }
   kept.push({
     wallet: spender.address,
     amount: o.amount.toString(),

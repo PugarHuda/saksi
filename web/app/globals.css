@@ -196,8 +196,14 @@ a { color: inherit; }
   display: inline-flex; align-items: center; gap: 6px;
   border-radius: var(--r-pill); padding: 2px 9px;
   font-size: var(--t-xs); font-weight: 500; letter-spacing: 0.01em;
-  border: 1px solid transparent; white-space: nowrap;
+  border: 1px solid transparent;
+  /* Was `nowrap`. A badge whose label runs long — "Rebuilt — rotate the root to anchor it"
+     in a 120px .kv column at 375px — then pushed the whole document sideways. Short labels
+     never reach a wrap; the long ones now stay inside their cell. */
+  max-width: 100%;
+  text-wrap: pretty;
 }
+.badge .dot { flex: 0 0 auto; }
 .badge.ok { color: var(--verified); background: var(--verified-soft); border-color: var(--verified-soft); }
 .badge.no { color: var(--refused); background: var(--refused-soft); border-color: var(--refused-soft); }
 .badge.warn { color: var(--accent); background: var(--accent-soft); border-color: var(--accent-soft); }
@@ -667,6 +673,34 @@ footer.foot {
   .split-panel { border-radius: var(--r) var(--r) 0 0; }
   .split-visual { border-left: 1px solid var(--border); border-radius: 0 0 var(--r) var(--r); min-height: 380px; }
   .split-body { padding: 30px 4px; }
+}
+
+/* ---- evidence screen ----------------------------------------------------
+   Two new patterns, both built from tokens already declared above. */
+
+/* A command a reader is meant to run. The code stays selectable; the button is a shortcut. */
+.copyable { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; max-width: 100%; }
+.copyable code {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  font-size: var(--t-2xs);
+  overflow-wrap: anywhere;
+  padding: 3px 6px;
+}
+.btn.copy { font-size: var(--t-2xs); font-weight: 500; min-height: 28px; padding: 3px 9px; }
+
+/* An unanswered request is the point of the screen, not a failure on it: the accent rule
+   marks it as evidence, where --refused would read as something that went wrong. */
+.open-request { background: var(--accent-soft); border-left: 2px solid var(--accent); }
+
+/* Row headers in the agreement table are the claim, not a column label. */
+tbody th[scope="row"] {
+  border-bottom: 1px solid var(--border);
+  color: var(--foreground);
+  font-weight: 500;
+  vertical-align: top;
+  white-space: normal;
 }
 
 /* The tab panels wrap every table in a bare `.grid`. Its implicit column sizes to the

@@ -88,7 +88,31 @@ export function decodeRules(hex: string): RuleV2[] {
  *  an error the views already know how to render. */
 const TIMEOUT_MS = 12_000;
 
-async function rpc<T = string>(method: string, params: unknown[]): Promise<T> {
+/** The public Monad endpoint rate-limits a burst. Loading the console fires ten reads, and
+ *  the evidence screen adds two dozen more, which was enough to earn a wall of 429s and a
+ *  page of "Monad refused the read". Cap what is in flight and retry a throttled read once.
+ *
+ *  ponytail: four slots and one retry, not a queueing library. Swap in a batched
+ *  eth_call/multicall if the read count ever grows past a screenful. */
+const MAX_IN_FLIGHT = 4;
+let inFlight = 0;
+const waiting: (() => void)[] = [];
+
+async function slot<T>(fn: () => Promise<T>): Promise<T> {
+  if (inFlight >= MAX_IN_FLIGHT) await new Promise<void>((r) => waiting.push(r));
+  inFlight++;
+  try {
+    return await fn();
+  } finally {
+    inFlight--;
+    waiting.shift()?.();
+  }
+}
+
+const THROTTLED = Symbol("throttled");
+type Throttled = Error & { [THROTTLED]?: true };
+
+async function send<T>(method: string, params: unknown[]): Promise<T> {
   let res: Response;
   try {
     res = await fetch(RPC, {
@@ -107,7 +131,15 @@ async function rpc<T = string>(method: string, params: unknown[]): Promise<T> {
         : "Could not reach Monad — the network or the RPC endpoint is unavailable.",
     );
   }
-  if (!res.ok) throw new Error(`Monad refused the read (HTTP ${res.status}).`);
+  if (!res.ok) {
+    const err: Throttled = new Error(
+      res.status === 429
+        ? "Monad is rate-limiting this browser — wait a moment and retry."
+        : `Monad refused the read (HTTP ${res.status}).`,
+    );
+    if (res.status === 429 || res.status >= 500) err[THROTTLED] = true;
+    throw err;
+  }
   let body: { error?: { message?: string }; result?: T };
   try {
     body = await res.json();
@@ -116,6 +148,18 @@ async function rpc<T = string>(method: string, params: unknown[]): Promise<T> {
   }
   if (body.error) throw new Error(body.error.message ?? "The RPC endpoint returned an error.");
   return body.result as T;
+}
+
+async function rpc<T = string>(method: string, params: unknown[]): Promise<T> {
+  return slot(async () => {
+    try {
+      return await send<T>(method, params);
+    } catch (e) {
+      if (!(e as Throttled)[THROTTLED]) throw e;
+      await new Promise((r) => setTimeout(r, 800));
+      return send<T>(method, params);
+    }
+  });
 }
 
 const pad = (addr: string) => addr.replace(/^0x/, "").toLowerCase().padStart(64, "0");

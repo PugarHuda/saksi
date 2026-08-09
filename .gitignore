@@ -43,3 +43,7 @@ web/tsconfig.tsbuildinfo
 # Next 16 writes these into the tree on `npm run dev`.
 web/AGENTS.md
 web/CLAUDE.md
+
+# Per-holder ledgers carry that holder spending key.
+notes.*.json
+!notes.public.json

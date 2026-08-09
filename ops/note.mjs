@@ -31,8 +31,21 @@ export async function noteTools() {
   };
 }
 
-export const loadNotes = () =>
-  fs.existsSync(FILE) ? JSON.parse(fs.readFileSync(FILE, "utf8")) : [];
+// A register with one ledger file has one holder. The recipient of a shielded transfer
+// keeps their own, because the whole point is that the sender cannot spend what they sent —
+// so the file that carries the spending key must not be the sender's.
+//   NOTES=notes.holder2.json node ops/audit.mjs threshold 200
+export const notesFile = () =>
+  process.env.NOTES ? path.resolve(ROOT, process.env.NOTES) : FILE;
+
+export const loadNotes = (file = notesFile()) => {
+  if (!fs.existsSync(file)) return [];
+  const raw = JSON.parse(fs.readFileSync(file, "utf8"));
+  // Two shapes on purpose. The operator's ledger is a bare array of positions; a recipient's
+  // is an object carrying their spending key and the notes that arrived, because the key is
+  // the thing that makes it theirs and it should not be one entry among many.
+  return Array.isArray(raw) ? raw : (raw.notes ?? []);
+};
 
 export function saveNote(note) {
   const all = loadNotes();

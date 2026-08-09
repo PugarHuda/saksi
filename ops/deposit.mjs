@@ -84,7 +84,16 @@ const pubKey = t.pubKey(privKey);
 const commitment = t.commitment(amount, pubKey, blinding);
 
 const sourceKey = sourceKeyOf(who);
-const denyList = new Array(8).fill(0n);       // must equal the pool's on-chain list
+// Read the pool's list, do not assume it. The comment here used to say "must equal the
+// pool's on-chain list" beside an array of zeros, which was true until a real sanctions
+// entry was set — after which every deposit reverted DenyListMismatch, including the one the
+// README hands a judge as the quickstart.
+const denyList = cast(["call", dep.pool, "getDenyList()(uint256[8])", "--rpc-url", RPC])
+  .replace(/^\[|\]$/g, "")
+  .split(",")
+  // cast glues a human-readable exponent onto each element — "5685… [5.685e75]" — so the
+  // annotation comes off per element; stripping brackets globally merges digits with it.
+  .map((x) => BigInt((x.trim().match(/^\d+/) ?? ["0"])[0]));
 
 const input = {
   aspRoot: asp.root,

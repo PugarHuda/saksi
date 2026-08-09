@@ -44,8 +44,8 @@ privacy pool — destroys the accountability that made the asset legitimate.
    `deposit()` calls `complianceVerify(pool, msg.sender)` on it live, inside the transaction
    that moves value. An unregistered pool reverts rather than returning false.
 2. **The asset is a real CVA.** `SAKSIAZEV` issued through `atoken/launch` with a `min_tier
-   30` rule from issuance. `activeRules()` on our pool and `getRulesV2()` on yours return the
-   identical tuple.
+   30` rule from issuance. `activeRules()` on our pool forwards to `getRulesV2()` on yours — the
+   rule is yours, read live, not mirrored on our side.
 3. **The association set is derived from live CVI** — 524 members from a population of 602,
    rebuilt from A-Pass state each run, root anchored on-chain.
 4. **Revocation is a rebuild, not a blacklist.** Freeze an A-Pass and the next set is built

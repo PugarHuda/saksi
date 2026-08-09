@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { Asp, AuditEntry, Deployment, Measurement, Position } from "@/lib/types";
 import { useLive } from "@/lib/useLive";
+import EvidenceView from "./EvidenceView";
 import HolderView from "./HolderView";
 import RegisterView from "./RegisterView";
 import IssuerView from "./IssuerView";
@@ -11,8 +12,10 @@ import GatesView from "./GatesView";
 import { Badge } from "./bits";
 
 const TABS = [
-  // The holder first. Every other tab is evidence about the register; this one is the
-  // only screen that answers a question about the person looking at it.
+  // Evidence first. A reader who has five minutes needs the checkable claims in one place,
+  // with the call that confirms each — assembling that from four tabs is work we can do for
+  // them. The holder screen follows: the only one that answers a question about the reader.
+  { id: "evidence", label: "Evidence" },
   { id: "holder", label: "Am I eligible?" },
   { id: "register", label: "Register" },
   { id: "gates", label: "Two gates" },
@@ -35,7 +38,7 @@ export default function Console({
   positions: Position[];
   measurement: Measurement | null;
 }) {
-  const [tab, setTab] = useState<TabId>("holder");
+  const [tab, setTab] = useState<TabId>("evidence");
   const live = useLive(deployment);
 
   return (
@@ -83,9 +86,12 @@ export default function Console({
             onClick={() => setTab(t.id)}
             onKeyDown={(e) => {
               const delta = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-              if (!delta) return;
+              // Home and End are part of the tablist pattern, not an extra: a keyboard user
+              // reaching the far end of six tabs should not have to hold an arrow key.
+              const jump = e.key === "Home" ? 0 : e.key === "End" ? TABS.length - 1 : null;
+              if (!delta && jump === null) return;
               e.preventDefault();
-              const next = TABS[(i + delta + TABS.length) % TABS.length];
+              const next = TABS[jump ?? (i + delta + TABS.length) % TABS.length];
               setTab(next.id);
               document.getElementById(`tab-${next.id}`)?.focus();
             }}
@@ -95,7 +101,19 @@ export default function Console({
         ))}
       </nav>
 
-      <main role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
+      {/* role="tabpanel" on <main> replaced the main landmark rather than adding to it, so
+          the console had no main for a screen reader to jump to. Nest instead. */}
+      <main>
+        <div role="tabpanel" id={`panel-${tab}`} aria-labelledby={`tab-${tab}`}>
+        {tab === "evidence" && (
+          <EvidenceView
+            deployment={deployment}
+            live={live}
+            audit={audit}
+            asp={asp}
+            positions={positions}
+          />
+        )}
         {tab === "holder" && <HolderView deployment={deployment} asp={asp} />}
         {tab === "register" && (
           <RegisterView
@@ -110,6 +128,7 @@ export default function Console({
         {tab === "regulator" && (
           <RegulatorView deployment={deployment} audit={audit} positions={positions} />
         )}
+        </div>
       </main>
 
       <footer className="foot">

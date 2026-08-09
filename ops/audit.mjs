@@ -280,10 +280,11 @@ else if (cmd === "aggregate") {
   const TRANSACTED = cast(["sig-event", "Transacted(bytes32,bytes32,uint256,address)"]).trim();
   const transferTxs = [...new Set(notes.filter((n) => n.origin === "transact")
     .map((n) => n.depositTx).filter(Boolean))];
-  const retiredOnChain = transferTxs.reduce((sum, tx) => {
-    const receipt = cast(["receipt", tx, "--rpc-url", RPC]);
-    return sum + (receipt.includes(TRANSACTED) ? 2 : 0);   // two inputs nullified per transfer
-  }, 0);
+  // Count from the CHAIN, not from a ledger-derived list of transactions. Deriving the
+  // list from surviving notes undercounts: a transfer whose own outputs were later spent
+  // leaves no note pointing back at it, so the guard that exists to catch a lying ledger
+  // started refusing the honest case instead.
+  const retiredOnChain = onChain.length - required.filter((r) => r.note).length;
   const retiredClaimed = required.length - required.filter((r) => r.note).length;
   if (retiredClaimed !== retiredOnChain) {
     console.log(`the register accounts for ${retiredClaimed} retired commitment(s) but the chain shows ${retiredOnChain}.`);
