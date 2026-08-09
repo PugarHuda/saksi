@@ -28,3 +28,7 @@ contracts/.artifacts/
 # The raw association set carries other teams' wallets; asp.public.json is published.
 asp.json
 asp.previous.json
+
+# Archived ledgers from superseded pools - they carry opening secrets.
+*.bak
+*.pool-0x*.bak
