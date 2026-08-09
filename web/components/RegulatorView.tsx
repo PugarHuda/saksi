@@ -38,12 +38,16 @@ export default function RegulatorView({
 }) {
   const answered = audit.filter((a) => a.verified);
   const exact = audit.filter((a) => a.kind === "exact");
-  // There used to be a line here telling the reader that the commitment behind an older
-  // answer "has since been spent". It was inferred from timestamps in a bundle that only
-  // listed live positions — and that bundle no longer says which leaves are live, because
-  // publishing it let an observer solve the whole transfer graph by elimination. The
-  // inference is gone with the signal it rested on, which is correct: whether a named
-  // position is still held is exactly the thing this register does not disclose unasked.
+  // Two lines used to tell the reader that the commitment behind an older answer "has since
+  // been spent", inferred from a bundle that listed only live positions. That bundle no longer
+  // says which leaves are live, because publishing it let an observer solve the transfer graph
+  // by elimination — so the inference lost the signal it rested on.
+  //
+  // The first was removed and this comment was written as though both had been. The second
+  // survived in the card below and got worse on its own: positions.length is now every leaf
+  // ever inserted, so it rendered "12 live positions" — asserting liveness the register
+  // withholds AND miscounting it. A comment claiming a fix that did not happen is worse than
+  // the bug, because it stops the next reader from looking.
 
   return (
     <div className="grid">
@@ -72,10 +76,11 @@ export default function RegulatorView({
           <h2>Answers that revealed a figure</h2>
           <p className="stat mono">{exact.length}</p>
           <p className="note" style={{ margin: "8px 0 0" }}>
-            Only an exact disclosure names a number; every other kind answered without one. This
-            is not a fraction of the {positions.length} live position
-            {positions.length === 1 ? "" : "s"} — the commitments these were asked about have
-            since been spent, and a spent note is not a position.
+            Only an exact disclosure names a number; every other kind answered without one.
+            Not a fraction of anything on the Register tab: an audit names a commitment, and
+            whether that position is still held is the thing this register does not disclose
+            unasked. The bundle lists {positions.length} leaves and says nothing about which
+            of them are live.
           </p>
         </div>
       </section>
